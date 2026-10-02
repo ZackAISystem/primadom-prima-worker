@@ -1,0 +1,22 @@
+{
+  "version": "ContextEnvelopeV1",
+  "conversation_id": null,
+  "visitor_id": null,
+  "session_id": null,
+  "page": {
+    "page_id": null,
+    "page_type": null,
+    "language_code": "en",
+    "url_path": null,
+    "canonical_url_path": null
+  },
+  "entity": {
+    "primary_type": null,
+    "primary_slug": null,
+    "secondary_type": null,
+    "secondary_slug": null
+  },
+  "user": {
+    "message": null
+  }
+}

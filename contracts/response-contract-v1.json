@@ -1,0 +1,16 @@
+{
+  "version": "ResponseContractV1",
+  "conversation_id": null,
+  "route": null,
+  "response_type": "answer",
+  "answer": null,
+  "cards": [],
+  "follow_up": null,
+  "lead_action": null,
+  "meta": {
+    "language": "en",
+    "used_openai": false,
+    "used_database": false,
+    "used_search": false
+  }
+}
