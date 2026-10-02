@@ -4,6 +4,10 @@ import { buildContextEnvelope } from "./context.js";
 import { resolveKnowledge } from "./knowledge.js";
 import { buildStructuredAnswer } from "./structured-answer.js";
 import {
+  getToolIds,
+  canUseTool
+} from "./tool-registry.js";
+import {
   persistMemoryFacts,
   loadActiveMemory
 } from "./memory-store.js";
@@ -50,9 +54,33 @@ function buildResponse({
   };
 }
 
+function emptyKnowledgePack(route) {
+  return {
+    version: "NoKnowledgeRequiredV1",
+    resolved: false,
+    page: null,
+    blocks: [],
+    relations: [],
+    meta: {
+      route,
+      page_type: null,
+      blocks_loaded: 0,
+      relations_loaded: 0,
+      used_database: false,
+      resolver_latency_ms: 0,
+      database_calls: 0,
+      retrieval_mode: "not_required"
+    }
+  };
+}
+
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    const debugEnabled =
+      url.searchParams.get("debug") === "1";
 
     if (request.method === "OPTIONS") {
       return new Response(null, {
@@ -164,6 +192,99 @@ export default {
     }
 
     // =====================================================
+    // LEAD CONTEXT
+    // =====================================================
+
+    if (
+      request.method === "POST" &&
+      url.pathname === "/api/prima/lead-context"
+    ) {
+      let body = {};
+
+      try {
+        body = await request.json();
+      } catch {
+        return json(
+          {
+            ok: false,
+            error: "invalid_json"
+          },
+          400
+        );
+      }
+
+      const conversationId =
+        body?.conversation_id || null;
+
+      if (!conversationId) {
+        return json(
+          {
+            ok: false,
+            error: "conversation_id_required"
+          },
+          400
+        );
+      }
+
+      try {
+        const activeMemory =
+          await loadActiveMemory(
+            env,
+            conversationId
+          );
+
+        const contextEnvelope =
+          await buildContextEnvelope(
+            env,
+            body,
+            "",
+            activeMemory
+          );
+
+        return json({
+          ok: true,
+          version: "LeadContextV1",
+          conversation_id: conversationId,
+
+          context: {
+            language:
+              contextEnvelope?.language || "en",
+
+            page:
+              contextEnvelope?.page || null,
+
+            entity:
+              contextEnvelope?.entity || null,
+
+            user:
+              contextEnvelope?.user || null,
+
+            memory:
+              activeMemory
+          }
+        });
+      } catch (error) {
+        console.error(error);
+
+        return json(
+          {
+            ok: false,
+            error: "lead_context_failed",
+            ...(debugEnabled
+              ? {
+                  detail:
+                    error?.message ||
+                    String(error)
+                }
+              : {})
+          },
+          500
+        );
+      }
+    }
+
+
+    // =====================================================
     // MESSAGE
     // =====================================================
 
@@ -231,6 +352,9 @@ export default {
             message,
             routingContext
           );
+
+        const allowedTools =
+          getToolIds(route);
         const userRows = await supabaseInsert(
           env,
           "messages",
@@ -291,19 +415,36 @@ export default {
             activeMemory
           );
 
-        const knowledgePack =
-          await resolveKnowledge(
-            env,
-            contextEnvelope,
-            route
+        const needsKnowledge =
+          canUseTool(
+            route,
+            "structured_lookup"
+          ) ||
+          canUseTool(
+            route,
+            "knowledge_retrieve"
           );
 
+        const knowledgePack =
+          needsKnowledge
+            ? await resolveKnowledge(
+                env,
+                contextEnvelope,
+                route
+              )
+            : emptyKnowledgePack(route);
+
         const structuredAnswer =
-  buildStructuredAnswer({
-    message,
-    route,
-    knowledgePack
-  });
+          canUseTool(
+            route,
+            "structured_lookup"
+          )
+            ? buildStructuredAnswer({
+                message,
+                route,
+                knowledgePack
+              })
+            : null;
 
 const answer =
   structuredAnswer?.answer ||
@@ -370,6 +511,7 @@ const answer =
 
             event_data: {
               route,
+              allowed_tools: allowedTools,
               language:
                 body?.page?.language_code || "en"
             }
@@ -435,24 +577,38 @@ const answer =
           conversationPatch
         );
 
-        return json({
-          ...response,
-          debug: {
+        const responsePayload = {
+          ...response
+        };
+
+        if (debugEnabled) {
+          responsePayload.debug = {
             persisted: true,
+
+            allowed_tools:
+              allowedTools,
+
             user_message_id:
               userRows?.[0]?.message_id || null,
+
             assistant_message_id:
               assistantRows?.[0]?.message_id || null,
+
             memory_facts_captured:
               savedMemory.length,
+
             active_memory:
               activeMemory,
+
             context_envelope:
               contextEnvelope,
+
             knowledge_pack:
               knowledgePack
-          }
-        });
+          };
+        }
+
+        return json(responsePayload);
       } catch (error) {
         console.error(error);
 
@@ -460,9 +616,13 @@ const answer =
           {
             ok: false,
             error: "message_persistence_failed",
-            detail:
-              error?.message ||
-              String(error)
+            ...(debugEnabled
+              ? {
+                  detail:
+                    error?.message ||
+                    String(error)
+                }
+              : {})
           },
           500
         );
