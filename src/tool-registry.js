@@ -46,9 +46,10 @@ const ROUTE_TOOLS = Object.freeze({
     "knowledge_retrieve"
   ],
 
-  market_question: [
-    "knowledge_retrieve"
-  ],
+  // Current market claims require a verified/live source.
+  // Until that source is connected, market questions use
+  // the deterministic Market Guard and no retrieval/LLM.
+  market_question: [],
 
   compare: [
     "knowledge_retrieve"
@@ -73,6 +74,8 @@ const ROUTE_TOOLS = Object.freeze({
     "lead_start",
     "conversation_context"
   ],
+
+  persona_question: [],
 
   unsupported: []
 });

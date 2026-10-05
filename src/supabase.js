@@ -11,6 +11,40 @@ function headers(env) {
   };
 }
 
+async function fetchReadWithRetry(
+  url,
+  options
+) {
+  try {
+    return await fetch(
+      url,
+      options
+    );
+  } catch (firstError) {
+    console.warn(
+      "supabase_read_retry",
+      firstError?.message ||
+      String(firstError)
+    );
+
+    try {
+      return await fetch(
+        url,
+        options
+      );
+    } catch (secondError) {
+      throw new Error(
+        "supabase_network_failed:" +
+        (
+          secondError?.message ||
+          String(secondError)
+        )
+      );
+    }
+  }
+}
+
+
 export async function supabaseInsert(
   env,
   table,
@@ -72,13 +106,14 @@ export async function supabaseSelect(
   table,
   query
 ) {
-  const res = await fetch(
-    `${env.SUPABASE_REST_URL}/${table}?${query}`,
-    {
-      method: "GET",
-      headers: headers(env)
-    }
-  );
+  const res =
+    await fetchReadWithRetry(
+      `${env.SUPABASE_REST_URL}/${table}?${query}`,
+      {
+        method: "GET",
+        headers: headers(env)
+      }
+    );
 
   const text = await res.text();
 
@@ -97,19 +132,22 @@ export async function supabaseRpc(
   functionName,
   payload = {}
 ) {
-  const response = await fetch(
-    `${env.SUPABASE_REST_URL}/rpc/${functionName}`,
-    {
-      method: "POST",
+  const response =
+    await fetchReadWithRetry(
+      `${env.SUPABASE_REST_URL}/rpc/${functionName}`,
+      {
+        method: "POST",
 
-      headers: {
-        ...headers(env),
-        "content-type": "application/json"
-      },
+        headers: {
+          ...headers(env),
+          "content-type":
+            "application/json"
+        },
 
-      body: JSON.stringify(payload)
-    }
-  );
+        body:
+          JSON.stringify(payload)
+      }
+    );
 
   if (!response.ok) {
     const text = await response.text();

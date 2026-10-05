@@ -1,8 +1,19 @@
 import { routeIntent } from "./router.js";
+import { extractProjectComparisonTarget } from "./compare.js";
 import { extractMemoryFacts } from "./memory.js";
-import { buildContextEnvelope } from "./context.js";
+import {
+  buildContextEnvelope,
+  buildLocalContextEnvelope
+} from "./context.js";
 import { resolveKnowledge } from "./knowledge.js";
+import { buildEvidencePack } from "./evidence-pack.js";
+import {
+  shouldUseOpenAI,
+  generatePrimaAnswer
+} from "./openai-reasoning.js";
 import { buildStructuredAnswer } from "./structured-answer.js";
+import { buildGroundedFallback } from "./grounded-fallback.js";
+import { buildLocalRouteAnswer } from "./local-responses.js";
 import {
   getToolIds,
   canUseTool
@@ -75,8 +86,226 @@ function emptyKnowledgePack(route) {
 }
 
 
+
+function isGlobalNoKnowledgeGuard(
+  message
+) {
+  const q =
+    String(message || "")
+      .trim()
+      .toLowerCase();
+
+  const paymentPlan =
+    /\b(payment plan|payment schedule|installment plan|instalment plan|installments|instalments)\b/i
+      .test(q);
+
+  const liveAvailability =
+    /\b(availability|available right now|available now|units? available|live inventory|inventory now)\b/i
+      .test(q);
+
+  return (
+    paymentPlan ||
+    liveAvailability
+  );
+}
+
+
+function canUseStatelessFastPath({
+  body,
+  message,
+  route
+}) {
+  if (
+    route === "persona_question" ||
+    route === "market_question" ||
+    route === "unsupported" ||
+    isGlobalNoKnowledgeGuard(message)
+  ) {
+    return true;
+  }
+
+  const hasResolvedPage =
+    Boolean(
+      body?.page?.page_id &&
+      body?.page?.page_type
+    );
+
+  const hasResolvedEntity =
+    Boolean(
+      body?.entity?.primary_type &&
+      body?.entity?.primary_slug
+    );
+
+  if (
+    !hasResolvedPage ||
+    !hasResolvedEntity
+  ) {
+    return false;
+  }
+
+  /*
+    Explicit project comparison does not need
+    synchronous conversation/history reads.
+
+    The Compare Bundle RPC already returns:
+    - both projects
+    - selected knowledge
+    - active client memory
+
+    Referential targets remain on the full
+    conversation path.
+  */
+  if (
+    route === "compare" &&
+    body?.entity?.primary_type === "project"
+  ) {
+    const target =
+      extractProjectComparisonTarget(
+        message,
+        body?.entity?.primary_slug || ""
+      );
+
+    const needsHistory =
+      /\b(this one|that one|the first one|the second one|the third one|first one|second one|third one|previous one|earlier one|those|these)\b/i
+        .test(
+          target || ""
+        );
+
+    return Boolean(
+      target &&
+      !needsHistory
+    );
+  }
+
+  if (route === "exact_fact") {
+    return true;
+  }
+
+  if (route !== "page_question") {
+    return false;
+  }
+
+  /*
+    These phrases can depend on earlier
+    conversation state/preferences.
+    Keep them on the full-context path.
+  */
+  const needsConversationHistory =
+    /\b(the other|other one|another one|previous|earlier|same one|as before|for us|for me|my preferences|our preferences|those options|these options)\b/i
+      .test(message);
+
+  return !needsConversationHistory;
+}
+
+
+function mergeCurrentTurnMemory(
+  existingMemory = [],
+  currentFacts = []
+) {
+  const byKey = new Map();
+
+  for (const fact of existingMemory || []) {
+    if (!fact?.fact_key) {
+      continue;
+    }
+
+    byKey.set(
+      fact.fact_key,
+      fact
+    );
+  }
+
+  for (const fact of currentFacts || []) {
+    if (!fact?.fact_key) {
+      continue;
+    }
+
+    byKey.set(
+      fact.fact_key,
+      {
+        fact_key:
+          fact.fact_key,
+
+        fact_value:
+          fact.fact_value,
+
+        confidence:
+          fact.confidence,
+
+        updated_at:
+          new Date().toISOString(),
+
+        source:
+          "current_turn"
+      }
+    );
+  }
+
+  return [...byKey.values()];
+}
+
+
+function buildConversationPatch(
+  body,
+  route
+) {
+  const patch = {
+    current_intent: route,
+    last_message_at:
+      new Date().toISOString()
+  };
+
+  if (body?.page?.page_id) {
+    patch.current_page_id =
+      body.page.page_id;
+  }
+
+  if (body?.page?.page_type) {
+    patch.current_page_type =
+      body.page.page_type;
+  }
+
+  if (body?.page?.url_path) {
+    patch.current_url_path =
+      body.page.url_path;
+  }
+
+  if (body?.page?.canonical_url_path) {
+    patch.current_canonical_url_path =
+      body.page.canonical_url_path;
+  }
+
+  if (body?.page?.language_code) {
+    patch.language_code =
+      body.page.language_code;
+  }
+
+  if (body?.entity?.primary_type) {
+    patch.current_primary_entity_type =
+      body.entity.primary_type;
+  }
+
+  if (body?.entity?.primary_slug) {
+    patch.current_primary_entity_slug =
+      body.entity.primary_slug;
+  }
+
+  if (body?.entity?.secondary_type) {
+    patch.current_secondary_entity_type =
+      body.entity.secondary_type;
+  }
+
+  if (body?.entity?.secondary_slug) {
+    patch.current_secondary_entity_slug =
+      body.entity.secondary_slug;
+  }
+
+  return patch;
+}
+
+
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     const debugEnabled =
@@ -333,96 +562,92 @@ export default {
       }
 
       try {
-        const memoryBeforeTurn =
-          await loadActiveMemory(
-            env,
-            conversationId
-          );
-
-        const routingContext =
-          await buildContextEnvelope(
-            env,
-            body,
-            message,
-            memoryBeforeTurn
-          );
-
-        const route =
-          routeIntent(
-            message,
-            routingContext
-          );
-
-        const allowedTools =
-          getToolIds(route);
-        const userRows = await supabaseInsert(
-          env,
-          "messages",
-          {
-            conversation_id: conversationId,
-            role: "user",
-            content: message,
-            route,
-
-            page_id:
-              body?.page?.page_id || null,
-
-            page_type:
-              body?.page?.page_type || null,
-
-            primary_entity_type:
-              body?.entity?.primary_type || null,
-
-            primary_entity_slug:
-              body?.entity?.primary_slug || null,
-
-            secondary_entity_type:
-              body?.entity?.secondary_type || null,
-
-            secondary_entity_slug:
-              body?.entity?.secondary_slug || null,
-
-            metadata: {
-              contract: "ContextEnvelopeV1"
-            }
-          },
-          "message_id,created_at"
-        );
-
         const extractedFacts =
           extractMemoryFacts(message);
 
-        const savedMemory =
-          await persistMemoryFacts(env, {
-            conversationId,
-            visitorId: body?.visitor_id || null,
-            sourceMessageId:
-              userRows?.[0]?.message_id || null,
-            facts: extractedFacts
-          });
-
-        const activeMemory =
-          await loadActiveMemory(
-            env,
-            conversationId
+        let activeMemory =
+          mergeCurrentTurnMemory(
+            [],
+            extractedFacts
           );
 
-        const contextEnvelope =
-          await buildContextEnvelope(
-            env,
+        let contextEnvelope =
+          buildLocalContextEnvelope(
             body,
             message,
             activeMemory
           );
 
+        let route =
+          routeIntent(
+            message,
+            contextEnvelope
+          );
+
+        const statelessFastPath =
+          canUseStatelessFastPath({
+            body,
+            message,
+            route
+          });
+
+
+        if (!statelessFastPath) {
+          const [
+            memoryBeforeTurn,
+            fullContextEnvelope
+          ] = await Promise.all([
+            loadActiveMemory(
+              env,
+              conversationId
+            ),
+
+            buildContextEnvelope(
+              env,
+              body,
+              message,
+              []
+            )
+          ]);
+
+          activeMemory =
+            mergeCurrentTurnMemory(
+              memoryBeforeTurn,
+              extractedFacts
+            );
+
+          fullContextEnvelope
+            .memory
+            .active_facts =
+              activeMemory;
+
+          contextEnvelope =
+            fullContextEnvelope;
+
+          route =
+            routeIntent(
+              message,
+              contextEnvelope
+            );
+        }
+
+
+        const allowedTools =
+          getToolIds(route);
+
         const needsKnowledge =
-          canUseTool(
-            route,
-            "structured_lookup"
-          ) ||
-          canUseTool(
-            route,
-            "knowledge_retrieve"
+          !isGlobalNoKnowledgeGuard(
+            message
+          ) &&
+          (
+            canUseTool(
+              route,
+              "structured_lookup"
+            ) ||
+            canUseTool(
+              route,
+              "knowledge_retrieve"
+            )
           );
 
         const knowledgePack =
@@ -430,9 +655,33 @@ export default {
             ? await resolveKnowledge(
                 env,
                 contextEnvelope,
-                route
+                route,
+                message
               )
             : emptyKnowledgePack(route);
+
+        activeMemory =
+          contextEnvelope
+            ?.memory
+            ?.active_facts ||
+          activeMemory;
+
+        const evidencePack =
+          buildEvidencePack({
+            route,
+            message,
+            context: contextEnvelope,
+            knowledgePack
+          });
+
+        const localAnswer =
+          buildLocalRouteAnswer({
+            route,
+            message,
+            knowledgePack,
+            context:
+              contextEnvelope
+          });
 
         const structuredAnswer =
           canUseTool(
@@ -446,9 +695,42 @@ export default {
               })
             : null;
 
-const answer =
-  structuredAnswer?.answer ||
-  `Prima routing preview: "${message}" → ${route}`;
+        const useOpenAI =
+          !localAnswer &&
+          !structuredAnswer &&
+          shouldUseOpenAI({
+            route,
+            evidencePack,
+            knowledgePack
+          });
+
+        const openAIResult =
+          useOpenAI
+            ? await generatePrimaAnswer({
+                env,
+                route,
+                evidencePack,
+                deadlineMs: 600
+              })
+            : null;
+
+        const fallbackAnswer =
+          !localAnswer &&
+          !structuredAnswer &&
+          !openAIResult?.answer
+            ? buildGroundedFallback({
+                route,
+                evidencePack,
+                knowledgePack
+              })
+            : null;
+
+        const answer =
+          localAnswer ||
+          structuredAnswer?.answer ||
+          openAIResult?.answer ||
+          fallbackAnswer ||
+          `Prima routing preview: "${message}" → ${route}`;
 
         const response = buildResponse({
           conversationId,
@@ -457,125 +739,213 @@ const answer =
         });
 
         response.meta.used_database =
-          knowledgePack.meta.used_database;
+          Boolean(
+            knowledgePack
+              .meta
+              .used_database ||
+            !statelessFastPath
+          );
 
-        const assistantRows = await supabaseInsert(
-          env,
-          "messages",
-          {
-            conversation_id: conversationId,
-            role: "assistant",
-            content: answer,
-            route,
-            response_type: "answer",
+        response.meta.used_openai =
+          Boolean(openAIResult?.used);
 
-            page_id:
-              body?.page?.page_id || null,
+        const conversationPatch =
+          buildConversationPatch(
+            body,
+            route
+          );
 
-            page_type:
-              body?.page?.page_type || null,
+        const persistenceTask =
+          (async () => {
+            try {
+              const userRows =
+                await supabaseInsert(
+                  env,
+                  "messages",
+                  {
+                    conversation_id:
+                      conversationId,
 
-            primary_entity_type:
-              body?.entity?.primary_type || null,
+                    role: "user",
+                    content: message,
+                    route,
 
-            primary_entity_slug:
-              body?.entity?.primary_slug || null,
+                    page_id:
+                      body?.page?.page_id ||
+                      null,
 
-            secondary_entity_type:
-              body?.entity?.secondary_type || null,
+                    page_type:
+                      body?.page?.page_type ||
+                      null,
 
-            secondary_entity_slug:
-              body?.entity?.secondary_slug || null,
+                    primary_entity_type:
+                      body?.entity
+                        ?.primary_type ||
+                      null,
 
-            used_openai: false,
-            used_database:
-              knowledgePack.meta.used_database,
-            used_search: false,
+                    primary_entity_slug:
+                      body?.entity
+                        ?.primary_slug ||
+                      null,
 
-            metadata: {
-              contract: "ResponseContractV1"
+                    secondary_entity_type:
+                      body?.entity
+                        ?.secondary_type ||
+                      null,
+
+                    secondary_entity_slug:
+                      body?.entity
+                        ?.secondary_slug ||
+                      null,
+
+                    metadata: {
+                      contract:
+                        "ContextEnvelopeV1"
+                    }
+                  },
+                  "message_id,created_at"
+                );
+
+              const userMessageId =
+                userRows?.[0]
+                  ?.message_id ||
+                null;
+
+              await Promise.all([
+                persistMemoryFacts(
+                  env,
+                  {
+                    conversationId,
+
+                    visitorId:
+                      body?.visitor_id ||
+                      null,
+
+                    sourceMessageId:
+                      userMessageId,
+
+                    facts:
+                      extractedFacts
+                  }
+                ),
+
+                supabaseInsert(
+                  env,
+                  "messages",
+                  {
+                    conversation_id:
+                      conversationId,
+
+                    role:
+                      "assistant",
+
+                    content:
+                      answer,
+
+                    route,
+
+                    response_type:
+                      "answer",
+
+                    page_id:
+                      body?.page?.page_id ||
+                      null,
+
+                    page_type:
+                      body?.page?.page_type ||
+                      null,
+
+                    primary_entity_type:
+                      body?.entity
+                        ?.primary_type ||
+                      null,
+
+                    primary_entity_slug:
+                      body?.entity
+                        ?.primary_slug ||
+                      null,
+
+                    secondary_entity_type:
+                      body?.entity
+                        ?.secondary_type ||
+                      null,
+
+                    secondary_entity_slug:
+                      body?.entity
+                        ?.secondary_slug ||
+                      null,
+
+                    used_openai:
+                      Boolean(
+                        openAIResult?.used
+                      ),
+
+                    used_database:
+                      knowledgePack
+                        .meta
+                        .used_database,
+
+                    used_search:
+                      false,
+
+                    metadata: {
+                      contract:
+                        "ResponseContractV1"
+                    }
+                  },
+                  "message_id,created_at"
+                ),
+
+                supabaseInsert(
+                  env,
+                  "conversation_events",
+                  {
+                    conversation_id:
+                      conversationId,
+
+                    message_id:
+                      userMessageId,
+
+                    event_name:
+                      "message_routed",
+
+                    event_data: {
+                      route,
+
+                      allowed_tools:
+                        allowedTools,
+
+                      language:
+                        body?.page
+                          ?.language_code ||
+                        "en"
+                    }
+                  },
+                  "event_id"
+                ),
+
+                supabaseUpdate(
+                  env,
+                  "conversations",
+                  `conversation_id=eq.${conversationId}`,
+                  conversationPatch
+                )
+              ]);
+            } catch (error) {
+              console.error(
+                "prima_background_persistence_failed",
+                error
+              );
             }
-          },
-          "message_id,created_at"
-        );
+          })();
 
-        await supabaseInsert(
-          env,
-          "conversation_events",
-          {
-            conversation_id: conversationId,
-            message_id:
-              userRows?.[0]?.message_id || null,
-
-            event_name: "message_routed",
-
-            event_data: {
-              route,
-              allowed_tools: allowedTools,
-              language:
-                body?.page?.language_code || "en"
-            }
-          },
-          "event_id"
-        );
-
-        const conversationPatch = {
-          current_intent: route,
-          last_message_at:
-            new Date().toISOString()
-        };
-
-        if (body?.page?.page_id) {
-          conversationPatch.current_page_id =
-            body.page.page_id;
+        if (ctx?.waitUntil) {
+          ctx.waitUntil(
+            persistenceTask
+          );
+        } else {
+          void persistenceTask;
         }
-
-        if (body?.page?.page_type) {
-          conversationPatch.current_page_type =
-            body.page.page_type;
-        }
-
-        if (body?.page?.url_path) {
-          conversationPatch.current_url_path =
-            body.page.url_path;
-        }
-
-        if (body?.page?.canonical_url_path) {
-          conversationPatch.current_canonical_url_path =
-            body.page.canonical_url_path;
-        }
-
-        if (body?.page?.language_code) {
-          conversationPatch.language_code =
-            body.page.language_code;
-        }
-
-        if (body?.entity?.primary_type) {
-          conversationPatch.current_primary_entity_type =
-            body.entity.primary_type;
-        }
-
-        if (body?.entity?.primary_slug) {
-          conversationPatch.current_primary_entity_slug =
-            body.entity.primary_slug;
-        }
-
-        if (body?.entity?.secondary_type) {
-          conversationPatch.current_secondary_entity_type =
-            body.entity.secondary_type;
-        }
-
-        if (body?.entity?.secondary_slug) {
-          conversationPatch.current_secondary_entity_slug =
-            body.entity.secondary_slug;
-        }
-
-        await supabaseUpdate(
-          env,
-          "conversations",
-          `conversation_id=eq.${conversationId}`,
-          conversationPatch
-        );
 
         const responsePayload = {
           ...response
@@ -583,19 +953,17 @@ const answer =
 
         if (debugEnabled) {
           responsePayload.debug = {
-            persisted: true,
+            persistence_mode:
+              "background",
+
+            persistence_queued:
+              true,
 
             allowed_tools:
               allowedTools,
 
-            user_message_id:
-              userRows?.[0]?.message_id || null,
-
-            assistant_message_id:
-              assistantRows?.[0]?.message_id || null,
-
-            memory_facts_captured:
-              savedMemory.length,
+            current_turn_memory_facts:
+              extractedFacts.length,
 
             active_memory:
               activeMemory,
@@ -604,7 +972,30 @@ const answer =
               contextEnvelope,
 
             knowledge_pack:
-              knowledgePack
+              knowledgePack,
+
+            evidence_pack:
+              evidencePack,
+
+            openai:
+              openAIResult
+                ? {
+                    model:
+                      openAIResult.model,
+
+                    reasoning_effort:
+                      openAIResult.reasoning_effort,
+
+                    latency_ms:
+                      openAIResult.latency_ms,
+
+                    response_id:
+                      openAIResult.response_id,
+
+                    usage:
+                      openAIResult.usage
+                  }
+                : null
           };
         }
 
@@ -615,7 +1006,7 @@ const answer =
         return json(
           {
             ok: false,
-            error: "message_persistence_failed",
+            error: "message_processing_failed",
             ...(debugEnabled
               ? {
                   detail:
