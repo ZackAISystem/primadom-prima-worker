@@ -137,7 +137,7 @@ function buildCriticalFactGuard({
   ) {
     return (
       `I don't have verified live availability for ${projectName} right now. ` +
-      "Availability can change, so I won't present static project data as live inventory."
+      "If you'd like, I can ask a Primadom specialist to check the latest availability for you."
     );
   }
 
@@ -169,8 +169,8 @@ function buildCriticalFactGuard({
     }
 
     return (
-      `I don't have a verified payment plan for ${projectName} in the available Primadom data. ` +
-      "I won't infer one from the price, status or handover information."
+      `I don't have a verified payment plan for ${projectName} right now. ` +
+      "If you'd like, I can ask a Primadom specialist to check the latest terms for you."
     );
   }
 
@@ -329,19 +329,17 @@ export function buildLocalRouteAnswer({
 
   if (route === "market_question") {
     return (
-      "I don't have a verified live market dataset connected " +
-      "for current Dubai-wide market performance yet, so I won't " +
-      "invent transaction, demand, price-trend or rental figures. " +
-      "I can still help with verified Primadom knowledge about " +
-      "specific projects, developers, districts and buying decisions."
+      "I don't have verified live Dubai-wide market figures connected right now, " +
+      "so I won't guess current transaction, demand, price-trend or rental data. " +
+      "I can still help with verified Primadom knowledge, or connect you with a " +
+      "Primadom specialist if you need a current market check."
     );
   }
 
   if (route === "unsupported") {
     return (
-      "I'm focused on UAE real estate and Primadom-related questions. " +
-      "I can help with projects, areas, developers, comparisons, budgets, " +
-      "buyer fit, property search and UAE real-estate market questions."
+      "That's a little outside my area 😄 I'm much more useful when it comes to UAE real estate. " +
+      "I can help with projects, areas, developers, comparisons, budgets or finding the right property for you."
     );
   }
 
@@ -350,14 +348,24 @@ export function buildLocalRouteAnswer({
   }
 
   if (
+    /\b(what is primadom|what's primadom|what is primadom\.ai|about primadom|about primadom\.ai)\b/i
+      .test(q)
+  ) {
+    return (
+      "Primadom.ai is an AI-native UAE real estate intelligence platform combining " +
+      "market knowledge, intelligent search and Prima AI to help buyers and investors " +
+      "understand the market and make better property decisions."
+    );
+  }
+
+  if (
     /\b(who created you|who built you|who made you|creator|founder|thredeesh)\b/i
       .test(q)
   ) {
     return (
-      "Prima AI was created for Primadom Real Estate under the direction of " +
-      "Thredeesh Mannambeth Karyamkandy, Founder & CEO of Primadom Real Estate. " +
-      "My role is to help people make clearer UAE real-estate decisions using " +
-      "Primadom data, knowledge and AI."
+      "Prima AI was created under the direction of Thredeesh Mannambeth Karyamkandy, " +
+      "Founder & CEO of Primadom Real Estate. His experience and principles around " +
+      "honesty, data and personalised advice helped shape how I'm designed to work."
     );
   }
 
@@ -385,8 +393,8 @@ export function buildLocalRouteAnswer({
   }
 
   return (
-    "I'm Prima, Primadom Real Estate's UAE real-estate AI assistant. " +
-    "I use Primadom knowledge, structured property data and AI reasoning when " +
-    "needed to help you evaluate projects, areas and buying decisions."
+    "I'm Prima, an AI real estate advisor focused on the UAE market. " +
+    "I help buyers and investors understand their options, compare properties " +
+    "and make more confident property decisions."
   );
 }

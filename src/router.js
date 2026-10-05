@@ -31,7 +31,7 @@ export function routeIntent(
   // -------------------------------------------------------
 
   if (
-    /\b(who are you|what are you|about prima|prima ai|what can you do|what can you help|how can you help|your capabilities|your values|your principles|how do you work|who created you|who built you|who made you|thredeesh|primadom founder)\b/i
+    /\b(who are you|what are you|about prima|prima ai|what is primadom|what's primadom|what is primadom\.ai|about primadom|about primadom\.ai|what can you do|what can you help|how can you help|your capabilities|your values|your principles|how do you work|who created you|who built you|who made you|thredeesh|primadom founder)\b/i
       .test(q)
   ) {
     return "persona_question";

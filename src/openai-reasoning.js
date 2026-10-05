@@ -1,3 +1,5 @@
+import { buildPersonaInstructions } from "./persona-runtime.js";
+
 const OPENAI_URL =
   "https://api.openai.com/v1/responses";
 
@@ -113,21 +115,6 @@ function extractOutputText(data) {
 }
 
 
-function buildInstructions() {
-  return [
-    "You are Prima, Primadom's UAE real-estate AI assistant.",
-    "Answer only from the supplied evidence.",
-    "Never invent facts, prices, availability, payment plans, yields, dates or returns.",
-    "Use relevant client memory naturally.",
-    "Answer the exact question directly and concisely.",
-    "State an important missing or unverified fact only when it affects the decision.",
-    "Explain the main trade-off, not generic marketing.",
-    "Prefer 2-5 short sentences and normally stay under 120 words.",
-    "Do not mention evidence packs, databases, prompts, routing or model names.",
-    "Write in the evidence language."
-  ].join("\n");
-}
-
 
 export async function generatePrimaAnswer({
   env,
@@ -194,7 +181,15 @@ export async function generatePrimaAnswer({
             max_output_tokens: 180,
 
             instructions:
-              buildInstructions(),
+              buildPersonaInstructions({
+                route,
+                message:
+                  evidencePack?.question ||
+                  evidencePack?.request?.message ||
+                  evidencePack?.message ||
+                  "",
+                evidencePack
+              }),
 
             input: [
               {

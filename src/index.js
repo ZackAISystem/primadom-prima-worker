@@ -1,6 +1,21 @@
 import { routeIntent } from "./router.js";
 import { extractProjectComparisonTarget } from "./compare.js";
-import { extractMemoryFacts } from "./memory.js";
+import {
+  extractMemoryFacts,
+  isContextualNameCandidate,
+  isExpectingNameFromRecentMessages
+} from "./memory.js";
+import {
+  extractEntityDecisionFacts,
+  hasEntityDecisionSignal
+} from "./entity-decision-memory.js";
+import {
+  evaluateFunnel,
+  hasImmediateCommercialSignal
+} from "./funnel.js";
+import {
+  evaluateContactCapture
+} from "./contact-capture.js";
 import {
   buildContextEnvelope,
   buildLocalContextEnvelope
@@ -562,7 +577,7 @@ export default {
       }
 
       try {
-        const extractedFacts =
+        let extractedFacts =
           extractMemoryFacts(message);
 
         let activeMemory =
@@ -584,15 +599,99 @@ export default {
             contextEnvelope
           );
 
-        const statelessFastPath =
+        const contextualNameCandidate =
+          isContextualNameCandidate(
+            message
+          );
+
+        const entityDecisionSignal =
+          hasEntityDecisionSignal(
+            message
+          );
+
+        const immediateCommercialSignal =
+          hasImmediateCommercialSignal({
+            message,
+            route
+          });
+
+        const baseFastPath =
+          !contextualNameCandidate &&
+          !entityDecisionSignal &&
           canUseStatelessFastPath({
             body,
             message,
             route
           });
 
+        /*
+          Commercial CTA needs active funnel memory,
+          but an explicit resolved-page request does
+          not need synchronous conversation state +
+          recent-message reads.
 
-        if (!statelessFastPath) {
+          This preserves:
+          - ignored CTA suppression
+          - accepted handoff state
+          - Client Memory
+
+          while keeping the commercial path light.
+        */
+        const lightweightCommercialPath =
+          immediateCommercialSignal &&
+          baseFastPath;
+
+        const statelessFastPath =
+          baseFastPath &&
+          !immediateCommercialSignal;
+
+
+        let deferredCommercialMemoryTask =
+          null;
+
+        /*
+          Explicit compare already resolves through
+          resolve_project_compare_bundle_v1, which
+          loads conversation-scoped active memory.
+
+          Start Funnel memory loading concurrently
+          with Compare Bundle instead of serially.
+        */
+        if (
+          lightweightCommercialPath &&
+          route === "compare"
+        ) {
+          deferredCommercialMemoryTask =
+            loadActiveMemory(
+              env,
+              conversationId
+            );
+        } else if (lightweightCommercialPath) {
+          const memoryBeforeTurn =
+            await loadActiveMemory(
+              env,
+              conversationId
+            );
+
+          activeMemory =
+            mergeCurrentTurnMemory(
+              memoryBeforeTurn,
+              extractedFacts
+            );
+
+          contextEnvelope =
+            buildLocalContextEnvelope(
+              body,
+              message,
+              activeMemory
+            );
+
+          route =
+            routeIntent(
+              message,
+              contextEnvelope
+            );
+        } else if (!statelessFastPath) {
           const [
             memoryBeforeTurn,
             fullContextEnvelope
@@ -609,6 +708,44 @@ export default {
               []
             )
           ]);
+
+          const expectingName =
+            isExpectingNameFromRecentMessages(
+              fullContextEnvelope
+                ?.conversation
+                ?.recent_messages
+            );
+
+          if (
+            contextualNameCandidate &&
+            expectingName
+          ) {
+            extractedFacts =
+              extractMemoryFacts(
+                message,
+                {
+                  expectingName: true
+                }
+              );
+          }
+
+          const entityDecisionFacts =
+            extractEntityDecisionFacts({
+              message,
+              context:
+                fullContextEnvelope,
+              activeMemory:
+                memoryBeforeTurn
+            });
+
+          if (
+            entityDecisionFacts.length > 0
+          ) {
+            extractedFacts = [
+              ...extractedFacts,
+              ...entityDecisionFacts
+            ];
+          }
 
           activeMemory =
             mergeCurrentTurnMemory(
@@ -650,21 +787,104 @@ export default {
             )
           );
 
-        const knowledgePack =
+        const knowledgeTask =
           needsKnowledge
-            ? await resolveKnowledge(
+            ? resolveKnowledge(
                 env,
                 contextEnvelope,
                 route,
                 message
               )
-            : emptyKnowledgePack(route);
+            : Promise.resolve(
+                emptyKnowledgePack(
+                  route
+                )
+              );
+
+        const [
+          knowledgePack,
+          deferredMemoryBeforeTurn
+        ] = await Promise.all([
+          knowledgeTask,
+
+          deferredCommercialMemoryTask ||
+            Promise.resolve(null)
+        ]);
+
+        if (
+          deferredMemoryBeforeTurn !==
+          null
+        ) {
+          activeMemory =
+            mergeCurrentTurnMemory(
+              deferredMemoryBeforeTurn,
+              extractedFacts
+            );
+
+          contextEnvelope =
+            buildLocalContextEnvelope(
+              body,
+              message,
+              activeMemory
+            );
+        }
 
         activeMemory =
           contextEnvelope
             ?.memory
             ?.active_facts ||
           activeMemory;
+
+        const funnelDecision =
+          evaluateFunnel({
+            message,
+            route,
+            activeMemory,
+            fullContext:
+              !statelessFastPath
+          });
+
+        if (
+          funnelDecision
+            .memory_facts
+            .length > 0
+        ) {
+          extractedFacts = [
+            ...extractedFacts,
+            ...funnelDecision
+              .memory_facts
+          ];
+        }
+
+        const contactDecision =
+          evaluateContactCapture({
+            message,
+            activeMemory,
+            funnelDecision
+          });
+
+        if (
+          contactDecision.captured
+        ) {
+          /*
+            contact_captured is the final
+            funnel state for this turn.
+            Avoid two same-turn funnel_state
+            persistence rows.
+          */
+          extractedFacts =
+            extractedFacts.filter(
+              fact =>
+                fact?.fact_key !==
+                  "funnel_state"
+            );
+
+          extractedFacts = [
+            ...extractedFacts,
+            ...contactDecision
+              .memory_facts
+          ];
+        }
 
         const evidencePack =
           buildEvidencePack({
@@ -696,6 +916,10 @@ export default {
             : null;
 
         const useOpenAI =
+          !contactDecision
+            .answer_override &&
+          !funnelDecision
+            .answer_override &&
           !localAnswer &&
           !structuredAnswer &&
           shouldUseOpenAI({
@@ -726,6 +950,10 @@ export default {
             : null;
 
         const answer =
+          contactDecision
+            .answer_override ||
+          funnelDecision
+            .answer_override ||
           localAnswer ||
           structuredAnswer?.answer ||
           openAIResult?.answer ||
@@ -737,6 +965,33 @@ export default {
           route,
           answer
         });
+
+        if (
+          contactDecision
+            .response_type ||
+          funnelDecision
+            .response_type
+        ) {
+          response.response_type =
+            contactDecision
+              .response_type ||
+            funnelDecision
+              .response_type;
+        }
+
+        response.follow_up =
+          contactDecision
+            .follow_up ||
+          funnelDecision
+            .follow_up ||
+          null;
+
+        response.lead_action =
+          contactDecision
+            .lead_action ||
+          funnelDecision
+            .lead_action ||
+          null;
 
         response.meta.used_database =
           Boolean(
@@ -812,6 +1067,30 @@ export default {
                 null;
 
               await Promise.all([
+                contactDecision.captured
+                  ? supabaseInsert(
+                      env,
+                      "conversation_events",
+                      {
+                        conversation_id:
+                          conversationId,
+
+                        message_id:
+                          userMessageId,
+
+                        event_name:
+                          "lead_contact_captured",
+
+                        event_data:
+                          contactDecision
+                            .event_data
+                      },
+                      "event_id"
+                    )
+                  : Promise.resolve(
+                      null
+                    ),
+
                 persistMemoryFacts(
                   env,
                   {
@@ -845,7 +1124,7 @@ export default {
                     route,
 
                     response_type:
-                      "answer",
+                      response.response_type,
 
                     page_id:
                       body?.page?.page_id ||
