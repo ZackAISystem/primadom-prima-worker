@@ -66,6 +66,7 @@ const ROUTE_TOOLS = Object.freeze({
   ],
 
   follow_up: [
+    "knowledge_retrieve",
     "conversation_context",
     "client_memory"
   ],
@@ -82,8 +83,14 @@ const ROUTE_TOOLS = Object.freeze({
 
 
 export function getAllowedTools(route) {
+  // Only own, declared routes have tool permissions. Arbitrary values such as
+  // "constructor" must not resolve inherited Object.prototype properties.
+  // Unknown Persona/semantic routes fail closed without throwing.
   const ids =
-    ROUTE_TOOLS[route] || [];
+    typeof route === "string" &&
+    Object.prototype.hasOwnProperty.call(ROUTE_TOOLS, route)
+      ? ROUTE_TOOLS[route]
+      : [];
 
   return ids
     .map(id => TOOL_REGISTRY_V1[id])

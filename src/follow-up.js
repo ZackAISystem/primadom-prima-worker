@@ -69,7 +69,73 @@ function ordinalIndex(message) {
 }
 
 
+
+/*
+  E1_CANONICAL_CONVERSATION_ENTITY_V1
+
+  ConversationState is authoritative for the
+  currently selected conversational entity.
+
+  Ordinal references retain their existing
+  SearchContext resolution path.
+
+  No entity is fabricated or inferred from
+  an unverified conversational phrase.
+*/
+function e1CanonicalConversationEntity(context) {
+  const candidates = [
+    context?.conversation?.dialogue_state
+      ?.continuity_references?.current_entity,
+
+    context?.conversation?.state
+      ?.continuity_references?.current_entity,
+
+    context?.conversation_state
+      ?.continuity_references?.current_entity,
+
+    context?.state
+      ?.continuity_references?.current_entity
+  ];
+
+  for (const candidate of candidates) {
+    const type = String(
+      candidate?.type || ""
+    );
+
+    const slug = String(
+      candidate?.slug || ""
+    );
+
+    if (
+      !["project", "developer", "district"].includes(type) ||
+      !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)
+    ) {
+      continue;
+    }
+
+    return {
+      type,
+      slug,
+      name:
+        String(candidate?.name || "").trim() ||
+        humanizeSlug(slug),
+      source:
+        "canonical_conversation_state"
+    };
+  }
+
+  return null;
+}
+
 function latestStoredEntity(context) {
+  const canonical =
+    e1CanonicalConversationEntity(context);
+
+  if (canonical) {
+    return canonical;
+  }
+
+
   const messages =
     recentMessages(context);
 
@@ -107,6 +173,14 @@ function latestStoredEntity(context) {
 
 
 function currentContextEntity(context) {
+  const canonical =
+    e1CanonicalConversationEntity(context);
+
+  if (canonical) {
+    return canonical;
+  }
+
+
   const type =
     context
       ?.entity
@@ -153,6 +227,53 @@ export function resolveFollowUpReference({
     deterministic compare clarification.
   */
   if (ordinal !== null) {
+    const search =
+      context?.search;
+
+    const searchOffset =
+      Number.isInteger(
+        search?.current_batch_offset
+      )
+        ? search.current_batch_offset
+        : 0;
+
+    const searchResult =
+      Array.isArray(
+        search?.results
+      )
+        ? search.results[
+            searchOffset +
+            ordinal
+          ] || null
+        : null;
+
+    if (
+      ["project", "developer", "district"].includes(
+        searchResult?.entity_type || search?.entity_type
+      ) &&
+      searchResult?.slug
+    ) {
+      return {
+        resolved: true,
+
+        type:
+          searchResult.entity_type ||
+          search.entity_type,
+
+        slug:
+          searchResult.slug,
+
+        name:
+          searchResult.title ||
+          humanizeSlug(
+            searchResult.slug
+          ),
+
+        source:
+          "search_context_ordinal"
+      };
+    }
+
     for (
       let i = messages.length - 1;
       i >= 0;

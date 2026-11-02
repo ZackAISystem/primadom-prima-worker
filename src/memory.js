@@ -1,3 +1,4 @@
+import { normalizePreferredLocationTextV1 } from "./preferred-location-v1.js";
 const numberWords = {
   one: 1,
   two: 2,
@@ -54,6 +55,53 @@ function cleanTextValue(
   return cleaned || null;
 }
 
+function normalizePreferredName(
+  value
+) {
+  const cleaned =
+    cleanTextValue(
+      value,
+      40
+    );
+
+  if (!cleaned) {
+    return null;
+  }
+
+  /*
+    Preserve intentional casing:
+    AJ, McKay, Dany.
+
+    If all alphabetic characters were entered
+    lowercase, normalize each name part.
+  */
+  const letters =
+    cleaned.replace(
+      /[^A-Za-z]/g,
+      ""
+    );
+
+  if (
+    !letters ||
+    letters !==
+      letters.toLowerCase()
+  ) {
+    return cleaned;
+  }
+
+  return cleaned.replace(
+    /(^|[\s'-])([a-z])/g,
+    (
+      _match,
+      separator,
+      letter
+    ) =>
+      separator +
+      letter.toUpperCase()
+  );
+}
+
+
 function setFact(
   facts,
   factKey,
@@ -96,7 +144,7 @@ function looksLikeBareName(
   if (!text) return false;
 
   if (
-    !/^[A-Za-z][A-Za-z' -]{1,39}$/
+    !/^[A-Za-z][A-Za-z' -]{0,39}$/
       .test(text)
   ) {
     return false;
@@ -107,7 +155,6 @@ function looksLikeBareName(
 
   const blocked =
     new Set([
-      "passo",
       "dubai",
       "investment",
       "investor",
@@ -123,12 +170,51 @@ function looksLikeBareName(
       "okay",
       "ok",
       "sure",
+      "maybe",
+      "later",
+      "skip",
+      "pass",
+      "hello",
+      "hi",
+      "hey",
+      "help",
+      "whatever",
+      "idk",
+      "i dont know",
+      "i don't know",
       "thanks",
       "thank you"
     ]);
 
   return !blocked.has(lower);
 }
+
+function looksLikeQuestionOrRequest(
+  value = ""
+) {
+  const text =
+    String(value)
+      .trim()
+      .toLowerCase();
+
+  if (!text) {
+    return false;
+  }
+
+  return (
+    /\?$/.test(text) ||
+
+    /^(what|who|where|when|why|how|which|whose)\b/
+      .test(text) ||
+
+    /^(can|could|would|will|do|does|did|is|are|was|were|should|may)\b/
+      .test(text) ||
+
+    /^(show|find|search|tell|give|help|compare|recommend|explain|list|check|look|open|invest|buy|sell)\b/
+      .test(text)
+  );
+}
+
 
 export function isContextualNameCandidate(
   message = ""
@@ -137,10 +223,83 @@ export function isContextualNameCandidate(
     String(message).trim();
 
   return (
+    !looksLikeQuestionOrRequest(text) &&
     looksLikeBareName(text) &&
     text.split(/\s+/).length <= 3
   );
 }
+
+export function isNonNameOnboardingReply(
+  message = ""
+) {
+  const normalized =
+    String(message)
+      .trim()
+      .toLowerCase()
+      .replace(/[.!?]+$/g, "")
+      .replace(/\s+/g, " ");
+
+  return new Set([
+    "yes",
+    "no",
+    "okay",
+    "ok",
+    "sure",
+    "maybe",
+    "later",
+    "skip",
+    "pass",
+    "hello",
+    "hi",
+    "hey",
+    "help",
+    "whatever",
+    "idk",
+    "i dont know",
+    "i don't know",
+    "thanks",
+    "thank you"
+  ]).has(normalized);
+}
+
+
+// MEM02: narrow, deterministic social greeting recognition.
+// Intentionally anchored: a greeting prefacing Search/Contact must not
+// swallow the substantive request. No model call is needed for this case.
+export function isStandaloneGreeting(message = "") {
+  const q = String(message || "").trim();
+  if (!q || q.length > 130) return false;
+  return /^(?:hi|hello|hey|hiya|greetings|good\s+morning|good\s+afternoon|good\s+evening|morning|afternoon|evening)(?:[\s,!.:—-]+there)?(?:[\s,!.:—-]+(?:prima(?:\s+ai)?|primadom(?:\.ai)?))?[\s,!.?👋]*(?:(?:how\s+are\s+you|how(?:['’]s|\s+is)\s+it\s+going|hope\s+you(?:['’]re|\s+are)\s+well)[.!?]*)?$/iu.test(q);
+}
+
+// Remove a greeting ONLY when immediately followed by an explicit
+// self-introduction. Never trim a substantive Search/Contact request.
+function stripIntroGreeting(message = "") {
+  return String(message).trim().replace(
+    /^(?:(?:hi|hello|hey|hiya|greetings|good\s+morning|good\s+afternoon|good\s+evening|morning|afternoon|evening)(?:[\s,!.:—-]+there)?(?:[\s,!.:—-]+(?:prima(?:\s+ai)?|primadom(?:\.ai)?))?)[\s,!:—.-]+(?=i(?:['’]?m|\s+am)\b|my\s+name\s+is\b|(?:(?:you\s+can|you\s+may)\s+)?call\s+me\b)/iu,
+    ""
+  ).trim();
+}
+
+export function isExplicitNameOnlyMessage(
+  message = ""
+) {
+  const text =
+    stripIntroGreeting(message);
+
+  // These are requests or profile statements, NOT terminal name turns.
+  if (/\b(?:looking for|searching for|show me|find me|need an?\b|want an?\b|interested in|planning to|buying an?\b|seeking|compare|recommend|contact me|book an?\b)\b/i.test(text)) return false;
+
+  // A name + Search/Compare remains a mixed request, not a local name turn.
+  if (/\b(?:and|then)\s+(?:find|search|show|compare|recommend|contact|book|tell me|look for)\b/i.test(text)) return false;
+  return (
+    /^(?:(?:no|actually|sorry)\s*[,—-]?\s*)?(?:my name is|(?:(?:you can|you may)\s+)?call me)\s+(?!back\b|later\b|tomorrow\b|today\b|at\b|on\b|for\b|about\b)[A-Za-z][A-Za-z' -]{0,40}?(?:\s+(?:for (?:this|the) (?:conversation|chat)|instead of [A-Za-z][A-Za-z' -]{0,35}|from now on))?[.!]?$/i
+      .test(text) ||
+    /^I(?:['’]?m|\s+am)\s+[A-Za-z][A-Za-z' -]{0,40}[.!]?$/i
+      .test(text)
+  ) && extractMemoryFacts(message).some(fact => fact.fact_key === "user_name");
+}
+
 
 export function isExpectingNameFromRecentMessages(
   recentMessages = []
@@ -189,6 +348,8 @@ export function isExpectingNameFromRecentMessages(
     /\b(?:may|can|could)\s+i\s+(?:know|have|ask for)\s+your name\b/i
       .test(content) ||
     /\b(?:tell|share)\s+me\s+your name\b/i
+      .test(content) ||
+    /\bhow\s+should\s+i\s+address\s+you\b/i
       .test(content)
   );
 }
@@ -207,47 +368,142 @@ export function extractMemoryFacts(
 
   const facts = [];
 
+  // Keep the original text for all other facts (search, budget, contact).
+  // Only name parsing may ignore a short introductory greeting.
+  const nameText = stripIntroGreeting(text);
+
   let match;
 
   // -------------------------------------------------------
   // NAME
   // -------------------------------------------------------
 
+  // Explicit preferred names are Conversation/Memory, not Persona content.
+  // Preserve the underlying action if a user combines a name with Search.
   match = text.match(
-    /\bmy name is\s+([A-Za-z][A-Za-z' -]{1,40})/i
+    /\bmy name is\s+([A-Za-z][A-Za-z' -]{0,40})/i
   );
 
   if (!match) {
     match = text.match(
-      /\bcall me\s+([A-Za-z][A-Za-z' -]{1,40})/i
+      /\b(?:you can\s+|you may\s+)?call me\s+(?!back\b|later\b|tomorrow\b|today\b|at\b|on\b|for\b|about\b)([A-Za-z][A-Za-z' -]{0,40})/i
     );
   }
 
-  if (!match) {
-    match = text.match(
-      /^I(?:'|’)?m\s+([A-Z][A-Za-z' -]{1,40})[.!]?$/
-    );
+  if (match) {
+    const parsedName = match[1]
+      .replace(/[,;.!?][\s\S]*$/u, "")
+      .replace(/\s+and\s+(?=my\s+(?:phone|whats\s*app|whatsapp|email|number)\b)[\s\S]*$/i, "")
+      .replace(/\s+(?:for (?:this|the) (?:conversation|chat)|instead of\b|from now on\b|and (?:find|search|show|compare|recommend|book|contact)\b)[\s\S]*$/i, "")
+      .trim();
+    // Fail closed rather than persist an action or sentence as a name.
+    if (/^(?:call|contact|message|later|tomorrow|back|now|at|for)$/i.test(parsedName) ||
+        parsedName.split(/\s+/).length > 3) match = null;
+    else match[1] = parsedName;
   }
+
+    if (!match) {
+      /*
+        Explicit preferred name + intent.
+
+        I'm Zack, looking for a villa...
+        I'm Mohammed Ali — show me apartments...
+      */
+      match = nameText.match(
+        /^I(?:['’]?m|\s+am)\s+([A-Za-z][A-Za-z'-]*(?:\s+[A-Za-z][A-Za-z'-]*){0,2})\s*[,;:—-]\s*.+$/i
+      );
+    }
+
+    if (!match) {
+      /*
+        Explicit preferred name + intent without punctuation.
+
+        I'm Zack looking for a villa...
+        I'm Mohammed Ali show me apartments...
+      */
+      match = nameText.match(
+        /^I(?:['’]?m|\s+am)\s+([A-Za-z][A-Za-z'-]*(?:\s+[A-Za-z][A-Za-z'-]*){0,2}?)\s+(?=(?:looking|searching|show|find|need|want|interested|buying|seeking|after)\b).+$/i
+      );
+    }
+
+    if (!match) {
+      // Explicit name followed by an action joined with "and".
+      // Do not treat arbitrary "I'm X and Y" descriptions as names.
+      match = nameText.match(
+        /^I(?:['’]?m|\s+am)\s+([A-Za-z][A-Za-z'-]*(?:\s+[A-Za-z][A-Za-z'-]*){0,2}?)\s+and\s+(?=(?:looking|searching|show|find|need|want|interested|buying|seeking|after|search)\b).+$/i
+      );
+    }
+
+    if (!match) {
+      /*
+        Standalone preferred name.
+      */
+      match = nameText.match(
+        /^I(?:['’]?m|\s+am)\s+([A-Za-z][A-Za-z'-]*(?:\s+[A-Za-z][A-Za-z'-]*){0,2})[.!]?$/i
+      );
+    }
+
+    if (
+      !match &&
+      expectingName
+    ) {
+      /*
+        Prima has just asked how to address the user.
+
+        Zack, looking for a villa
+        Dany — show me apartments
+        Mohammed Ali, I need something under AED 3M
+
+        Only user_name is extracted.
+        Full original message continues unchanged.
+      */
+      match = text.match(
+        /^([A-Za-z][A-Za-z'-]*(?:\s+[A-Za-z][A-Za-z'-]*){0,2})\s*[,;:—-]\s*.+$/i
+      );
+    }
+
+    if (
+      !match &&
+      expectingName
+    ) {
+      /*
+        Same case without punctuation:
+
+        Zack looking for a villa
+        Dany show me apartments
+      */
+      match = text.match(
+        /^([A-Za-z][A-Za-z'-]*(?:\s+[A-Za-z][A-Za-z'-]*){0,2}?)\s+(?=(?:looking|searching|show|find|need|want|interested|buying|seeking|after)\b).+$/i
+      );
+    }
 
   if (
     match &&
-    looksLikeBareName(match[1])
+    looksLikeBareName(match[1]) &&
+    !looksLikeQuestionOrRequest(match[1]) &&
+      !/^(?:i|i['’]?m|im|my|we|we['’]?re|were)$/i.test(String(match[1]).trim()) &&
+    !/^(?:looking|searching|show|find|need|want|interested|buying|seeking|after|planning|trying|hoping|waiting|thinking|wondering|here|just|ready|sorry|not)\b/i.test(match[1])
   ) {
     setFact(
       facts,
       "user_name",
-      cleanTextValue(match[1], 40),
+      normalizePreferredName(
+        match[1]
+      ),
       0.99
     );
   } else if (
     expectingName &&
+    !looksLikeQuestionOrRequest(text) &&
     looksLikeBareName(text) &&
     text.split(/\s+/).length <= 3
   ) {
     setFact(
       facts,
       "user_name",
-      cleanTextValue(text, 40),
+      normalizePreferredName(
+        text
+      ),
       0.97
     );
   }
@@ -363,7 +619,7 @@ export function extractMemoryFacts(
   // -------------------------------------------------------
 
   match = lower.match(
-    /\b(?:i(?:'m| am)?\s+(?:looking for|seeking)|we(?:'re| are)?\s+(?:looking for|seeking)|i\s+(?:want|need|prefer)|we\s+(?:want|need|prefer))\s+(?:an?\s+)?(\d+)\s*(?:br|bed|beds|bedroom|bedrooms)\b/
+    /\b(?:i(?:'m| am)?\s+(?:looking for|seeking)|we(?:'re| are)?\s+(?:looking for|seeking)|i\s+(?:want|need|prefer)|we\s+(?:want|need|prefer))\s+(?:an?\s+)?(\d+)\s*[- ]?\s*(?:br|bed|beds|bedroom|bedrooms)\b/
   );
 
   if (match) {
@@ -422,43 +678,39 @@ export function extractMemoryFacts(
   // -------------------------------------------------------
   // BUYER GOAL — explicit personal intent only
   // -------------------------------------------------------
+  // Hypothetical questions must not become durable buyer goals.
+  const goalQuestion = looksLikeQuestionOrRequest(text);
 
-  if (
-    /\b(?:i|we)\b.{0,45}\b(second home|holiday home)\b/i
-      .test(text)
-  ) {
-    setFact(
-      facts,
-      "buyer_goal",
-      "second_home",
-      0.95
-    );
-  } else if (
-    /\b(?:i|we)\b.{0,55}\b(invest|investing|investment|rental income|capital appreciation)\b/i
-      .test(text) ||
-    /\b(?:buying|looking for|searching for)\s+(?:a\s+)?property\s+for\s+investment\b/i
-      .test(text)
-  ) {
-    setFact(
-      facts,
-      "buyer_goal",
-      "investment",
-      0.93
-    );
-  } else if (
-    /\b(?:i|we)\b.{0,55}\b(own use|personal use|move in|live there|live in it|family home|primary residence)\b/i
-      .test(text)
-  ) {
-    setFact(
-      facts,
-      "buyer_goal",
-      "personal_use",
-      0.93
-    );
+  const investmentNegated =
+    /\b(?:not|never|rather than|instead of|without)\s+(?:an?\s+)?(?:investment|investing|invest)\b/i.test(text) ||
+    /\b(?:do|does|did|am|are|was|were)\s+not\s+(?:want|looking\s+for|interested\s+in|planning|trying)\s+(?:an?\s+)?(?:investment|investing|invest)\b/i.test(text);
+
+  const personalUseDeclared =
+    /\bfor\s+(?:my|our)\s+family\s+to\s+live\s+in\b/i.test(text) ||
+    /\b(?:it|this)(?:'s| is)\s+for\s+(?:living|(?:my|our)\s+family)\b/i.test(text) ||
+    /\b(?:i|we)\b.{0,55}\b(?:own use|personal use|move in|live there|live in it|family home|primary residence)\b/i.test(text);
+
+  if (!goalQuestion) {
+    if (personalUseDeclared) {
+      setFact(facts, "buyer_goal", "personal_use", 0.96);
+    } else if (
+      /\b(?:i|we)\b.{0,45}\b(?:second home|holiday home)\b/i.test(text) &&
+      !/\bnot\s+(?:a\s+)?(?:second|holiday)\s+home\b/i.test(text)
+    ) {
+      setFact(facts, "buyer_goal", "second_home", 0.95);
+    } else if (
+      !investmentNegated &&
+      (
+        /\b(?:i|we)\b.{0,55}\b(?:invest|investing|investment|rental income|capital appreciation)\b/i.test(text) ||
+        /\b(?:buying|looking for|searching for)\s+(?:a\s+)?property\s+for\s+investment\b/i.test(text)
+      )
+    ) {
+      setFact(facts, "buyer_goal", "investment", 0.93);
+    }
   }
 
   // -------------------------------------------------------
-  // FINANCING — explicit personal financing intent
+    // FINANCING — explicit personal financing intent
   // -------------------------------------------------------
 
   if (
@@ -517,17 +769,11 @@ export function extractMemoryFacts(
   }
 
   if (match) {
-    const value =
-      cleanTextValue(
-        match[1],
-        60
-      );
+    const value = normalizePreferredLocationTextV1(
+      cleanTextValue(match[1], 80)
+    );
 
-    if (
-      value &&
-      !/^(something|anything|it|this|that|this project|that project)$/i
-        .test(value)
-    ) {
+    if (value) {
       setFact(
         facts,
         "preferred_location_text",
@@ -804,4 +1050,154 @@ export function extractMemoryFacts(
   }
 
   return facts;
+}
+
+/*
+  Canonical Memory value contract.
+
+  One logical durable fact must have one JSON type
+  regardless of producer (deterministic extraction,
+  Request Interpreter, Funnel, etc.).
+
+  This is especially important because PostgreSQL JSONB
+  correctly treats 4000000 and "4000000" as different.
+*/
+const CANONICAL_NUMERIC_MEMORY_KEYS_V1 =
+  new Set([
+    "budget_min_aed",
+    "budget_max_aed",
+    "bedrooms",
+    "children_count"
+  ]);
+
+
+export function normalizeMemoryFactValue(
+  factKey,
+  value
+) {
+  if (
+    !CANONICAL_NUMERIC_MEMORY_KEYS_V1
+      .has(factKey)
+  ) {
+    return value;
+  }
+
+  if (
+    typeof value === "number" &&
+    Number.isFinite(value)
+  ) {
+    return value;
+  }
+
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  const cleaned =
+    value
+      .trim()
+      .replace(/,/g, "")
+      .replace(/^AED\s*/i, "");
+
+  const match =
+    cleaned.match(
+      /^(-?\d+(?:\.\d+)?)\s*([kKmM])?$/
+    );
+
+  if (!match) {
+    return value;
+  }
+
+  const base =
+    Number(match[1]);
+
+  if (!Number.isFinite(base)) {
+    return value;
+  }
+
+  const suffix =
+    String(
+      match[2] || ""
+    ).toLowerCase();
+
+  const multiplier =
+    suffix === "m"
+      ? 1000000
+      : suffix === "k"
+        ? 1000
+        : 1;
+
+  const normalized =
+    base * multiplier;
+
+  return Number.isFinite(normalized)
+    ? normalized
+    : value;
+}
+
+
+export function normalizeMemoryFacts(
+  facts = []
+) {
+  const normalizedFacts = [];
+  const seen = new Set();
+
+  for (
+    const fact of
+    Array.isArray(facts)
+      ? facts
+      : []
+  ) {
+    if (
+      !fact ||
+      typeof fact !== "object"
+    ) {
+      continue;
+    }
+
+    const normalized = {
+      ...fact,
+
+      fact_value:
+        normalizeMemoryFactValue(
+          fact.fact_key,
+          fact.fact_value
+        )
+    };
+
+    let signature = null;
+
+    try {
+      signature =
+        JSON.stringify([
+          normalized.fact_key,
+          normalized.fact_value
+        ]);
+    } catch {
+      signature = null;
+    }
+
+    /*
+      Collapse only identical canonical facts.
+
+      Truly different values for the same key are preserved
+      so normal Memory replacement semantics still work.
+    */
+    if (
+      signature &&
+      seen.has(signature)
+    ) {
+      continue;
+    }
+
+    if (signature) {
+      seen.add(signature);
+    }
+
+    normalizedFacts.push(
+      normalized
+    );
+  }
+
+  return normalizedFacts;
 }

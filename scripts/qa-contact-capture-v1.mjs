@@ -66,11 +66,11 @@ function evaluate(
 
 
 /*
-  1. Accepted handoff → local UAE number.
+  1. Accepted handoff → international UAE number (H3.2).
 */
 const acceptedLocal =
   evaluate(
-    "0501234567",
+    "+971501234567",
     acceptedMemory()
   );
 
@@ -85,7 +85,7 @@ check(
     acceptedLocal,
     "contact_phone"
   )?.fact_value ===
-    "0501234567"
+    "+971501234567"
 );
 
 check(
@@ -142,7 +142,7 @@ check(
 */
 const voluntaryWhatsApp =
   evaluate(
-    "WhatsApp me on +44 7700 900123"
+    "WhatsApp me on +44 7911 123456"
   );
 
 check(
@@ -156,7 +156,7 @@ check(
     voluntaryWhatsApp,
     "contact_phone"
   )?.fact_value ===
-    "+447700900123"
+    "+447911123456"
 );
 
 check(
@@ -175,7 +175,7 @@ check(
 */
 const voluntaryPhone =
   evaluate(
-    "My phone number is 050 123 4567"
+    "My phone number is +971 50 123 4567"
   );
 
 check(
@@ -189,7 +189,7 @@ check(
     voluntaryPhone,
     "contact_phone"
   )?.fact_value ===
-    "0501234567"
+    "+971501234567"
 );
 
 
@@ -229,18 +229,18 @@ check(
 
 
 /*
-  7. But after accepted handoff a bare number
-  is exactly the expected reply.
+  7. A local number without country code is still ambiguous
+  even after accepted handoff.
 */
 const expectedBare =
   evaluate(
-    "12345678",
+    "0501234567",
     acceptedMemory()
   );
 
 check(
   "expected_bare_not_captured",
-  expectedBare?.captured === true
+  expectedBare?.captured === false
 );
 
 
@@ -274,7 +274,7 @@ const eventJson =
 check(
   "raw_phone_in_event",
   !eventJson.includes(
-    "0501234567"
+    "+971501234567"
   )
 );
 
@@ -361,6 +361,17 @@ check(
       "contact_received"
 );
 
+
+/* H27: complete voluntary first-message handoff, no prerequisite CTA. */
+const mixedFirst = evaluateContactCapture({
+  message: "Hi, my name is Zack and my WhatsApp is +971 50 123 4567. Please contact me about Passo.",
+  currentFacts: [{ fact_key: "user_name", fact_value: "Zack" }],
+  activeMemory: []
+});
+check("H27_first_turn_contact", mixedFirst.captured === true);
+check("H27_first_turn_personal_ack", /Thank you, Zack/.test(mixedFirst.answer_override || ""));
+check("H27_first_turn_whatsapp", fact(mixedFirst,"preferred_contact_channel")?.fact_value === "whatsapp");
+check("H27_bare_local_clarification", /country code/i.test(expectedBare.answer_override || ""));
 
 console.log(
   "PASS ✅ — Handoff / Contact Capture V1"

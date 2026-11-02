@@ -439,7 +439,7 @@ function topicRelevance(
       /apartment|villa|penthouse|townhouse|bedroom|br|unit/,
 
     developer:
-      /developer|track record|beyond|emaar|aldar/,
+      /developer|track record|portfolio|delivery history|reputation/,
 
     market:
       /market|transaction|demand|supply|price trend|sales/
@@ -521,7 +521,7 @@ function buildSource({
   role,
   topics
 }) {
-  return {
+  const source = {
     role,
 
     block_family:
@@ -533,6 +533,38 @@ function buildSource({
         topics
       )
   };
+
+  /*
+    Current-page sources already inherit entity
+    identity from ContextEnvelope.
+
+    Multi-project Search evidence must carry its
+    own identity so facts cannot be mixed between
+    candidates during reasoning.
+  */
+  if (
+    block?.entity_type &&
+    block?.entity_slug
+  ) {
+    source.entity = {
+      type:
+        block.entity_type,
+
+      slug:
+        block.entity_slug,
+
+      name:
+        block.entity_name ||
+        block.entity_slug,
+
+      rank:
+        Number(
+          block.candidate_rank || 0
+        ) || null
+    };
+  }
+
+  return source;
 }
 
 
@@ -792,6 +824,12 @@ export function buildEvidencePack({
         )
     }
   };
+
+
+  if (context?.search) {
+    pack.search_context =
+      context.search;
+  }
 
 
   pack.meta.approx_chars =

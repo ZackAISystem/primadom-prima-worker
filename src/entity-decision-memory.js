@@ -38,21 +38,41 @@ function projectFromSlug(
 function currentProject(
   context
 ) {
+  // Existing, explicit entity still takes priority.
   if (
-    context
-      ?.entity
-      ?.primary_type !== "project" ||
-    !context
-      ?.entity
-      ?.primary_slug
+    context?.entity?.primary_type === "project" &&
+    context?.entity?.primary_slug
   ) {
-    return null;
+    return projectFromSlug(
+      context.entity.primary_slug,
+      "current_context"
+    );
   }
 
-  return projectFromSlug(
-    context.entity.primary_slug,
-    "current_context"
-  );
+  // MEM11: a Discuss click can make the verified project current
+  // in ConversationStateV1 without changing the browser page.
+  // Require a matching E21 verified project; a raw/forged slug
+  // in a state slot alone is never enough to create Decision Memory.
+  const state = context?.conversation?.dialogue_state;
+  const current = state?.continuity_references?.current_entity;
+  const verified = Array.isArray(state?.e21_verified_entities)
+    ? state.e21_verified_entities
+    : [];
+  if (
+    current?.type === "project" &&
+    current?.slug &&
+    verified.some(item =>
+      item?.type === "project" &&
+      item?.slug === current.slug
+    )
+  ) {
+    return projectFromSlug(
+      current.slug,
+      "verified_conversation_state"
+    );
+  }
+
+  return null;
 }
 
 
@@ -263,6 +283,32 @@ export function hasEntityDecisionSignal(
 ) {
   return Boolean(
     detectDecisionStatus(message)
+  );
+}
+
+/*
+ * MEM11: conservative, zero-token path for a single statement
+ * about a project already verified in this conversation.
+ * Mixed requests stay with the normal Router / Search / Contact.
+ * This classifies only shape, not target: resolution still requires
+ * a trusted current or recent project.
+ */
+export function isPureEntityDecisionStatementV1(message = "") {
+  const text = String(message || "").trim();
+  if (!text || text.length > 240 || /[?\n\r]/.test(text)) return false;
+  if (!detectDecisionStatus(text)) return false;
+  if (/(?:\b(?:show|find|search|compare|recommend|suggest|contact|call|whatsapp|email|book|schedule|viewing|tour|explain|tell me|how|why|what|which)\b)/i.test(text)) return false;
+  // Only one unambiguous client decision, not a compound task.
+  if (/\b(?:but|however|also|then)\b/i.test(text) ||
+      /\band\s+(?:i|we|can|could|please|show|find|compare|tell)\b/i.test(text)) return false;
+  return (
+    /^(?:i(?:'m| am)|we(?:'re| are))\s+(?:really\s+)?interested\s+in\s+[^?!]+[.!]*$/i.test(text) ||
+    /^(?:i|we)\s+(?:really\s+)?(?:like|love|prefer)\s+[^?!]+[.!]*$/i.test(text) ||
+    /^(?:i|we)\s+(?:do\s+not|don't|dont)\s+(?:like|want|prefer)\s+[^?!]+[.!]*$/i.test(text) ||
+    /^(?:please\s+)?(?:add|put|save)\s+[^?!]+\s+(?:to|on|in)\s+(?:my\s+|the\s+)?shortlist[.!]*$/i.test(text) ||
+    /^(?:please\s+)?shortlist\s+[^?!]+[.!]*$/i.test(text) ||
+    /^(?:please\s+)?(?:reject|skip)\s+[^?!]+[.!]*$/i.test(text) ||
+    /^not\s+for\s+(?:me|us)[.!]*$/i.test(text)
   );
 }
 

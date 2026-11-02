@@ -1,3 +1,19 @@
+function sanitizeEvidenceValue(
+  value
+) {
+  return String(value || "")
+    .replace(
+      /\bsrc_[a-z0-9_]+\b/gi,
+      ""
+    )
+    .replace(
+      /\s{2,}/g,
+      " "
+    )
+    .trim();
+}
+
+
 function evidenceValues(
   evidencePack
 ) {
@@ -10,9 +26,9 @@ function evidenceValues(
     )
     .map(
       item =>
-        String(
-          item?.value || ""
-        ).trim()
+        sanitizeEvidenceValue(
+          item?.value
+        )
     )
     .filter(Boolean);
 }
@@ -418,6 +434,25 @@ function buildProjectCompareAnswer(
   }
 
 
+  const topics =
+    knowledgePack
+      ?.planner
+      ?.topics || [];
+
+  const comparisonClosing =
+    topics.includes("investment")
+      ? (
+          "For investment, the verified data here supports a trade-off rather " +
+          "than a definitive return ranking. Entry price and handover timing " +
+          "are verified, but I do not have enough verified rental, resale or " +
+          "yield data here to rank expected returns reliably."
+        )
+      : (
+          "If you tell me whether your priority is investment, " +
+          "family living, budget or timing, I can compare them " +
+          "on that specific criterion."
+        );
+
   return [
     describe(
       currentName,
@@ -431,20 +466,248 @@ function buildProjectCompareAnswer(
       "comparison_target"
     ),
 
-    (
-      "If you tell me whether your priority is investment, " +
-      "family living, budget or timing, I can compare them " +
-      "on that specific criterion."
-    )
+    comparisonClosing
   ].join(" ");
+}
+
+
+function profileMemoryValue({
+  interpretation = null,
+  activeMemory = [],
+  key
+}) {
+  const candidates =
+    Array.isArray(
+      interpretation?.memory_candidates
+    )
+      ? interpretation.memory_candidates
+      : [];
+
+  for (
+    let i = candidates.length - 1;
+    i >= 0;
+    i -= 1
+  ) {
+    const item = candidates[i];
+
+    if (
+      item?.key === key &&
+      item?.value &&
+      Number(item?.confidence) >= 0.8
+    ) {
+      return item.value;
+    }
+  }
+
+  for (
+    let i = activeMemory.length - 1;
+    i >= 0;
+    i -= 1
+  ) {
+    const item = activeMemory[i];
+
+    const itemKey =
+      item?.fact_key ||
+      item?.key ||
+      item?.memory_key ||
+      null;
+
+    if (itemKey !== key) {
+      continue;
+    }
+
+    const value =
+      item?.fact_value ??
+      item?.value ??
+      item?.memory_value ??
+      null;
+
+    if (
+      value !== null &&
+      value !== undefined &&
+      value !== ""
+    ) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+
+function formatAedBudget(value) {
+  const numeric =
+    Number(value);
+
+  if (!Number.isFinite(numeric)) {
+    return String(value || "");
+  }
+
+  if (
+    numeric >= 1000000 &&
+    numeric % 1000000 === 0
+  ) {
+    return (
+      "AED " +
+      String(numeric / 1000000) +
+      " million"
+    );
+  }
+
+  return (
+    "AED " +
+    numeric.toLocaleString("en-US")
+  );
+}
+
+
+function buildProfileUpdateFallback({
+  interpretation = null,
+  activeMemory = []
+} = {}) {
+  const get =
+    key =>
+      profileMemoryValue({
+        interpretation,
+        activeMemory,
+        key
+      });
+
+  const budgetMax =
+    get("budget_max_aed");
+
+  const goal =
+    get("buyer_goal");
+
+  const horizon =
+    get("investment_horizon");
+
+  const location =
+    get("preferred_location_text");
+
+  const offPlan =
+    get("off_plan_preference");
+
+  const handoverTolerance =
+    get("handover_tolerance");
+
+  const profileParts = [];
+
+  if (budgetMax) {
+    profileParts.push(
+      `a budget up to ${formatAedBudget(
+        budgetMax
+      )}`
+    );
+  }
+
+  if (goal) {
+    profileParts.push(
+      `a goal of ${goal}`
+    );
+  }
+
+  if (horizon) {
+    profileParts.push(
+      `an investment horizon of ${horizon}`
+    );
+  }
+
+  if (location) {
+    profileParts.push(
+      `location preference: ${location}`
+    );
+  }
+
+  if (offPlan) {
+    profileParts.push(
+      `off-plan preference: ${offPlan}`
+    );
+  }
+
+  if (handoverTolerance) {
+    profileParts.push(
+      `handover preference: ${handoverTolerance}`
+    );
+  }
+
+  let acknowledgement = null;
+
+  if (
+    String(goal || "")
+      .trim()
+      .toLowerCase() ===
+        "investment" &&
+    budgetMax &&
+    horizon
+  ) {
+    acknowledgement =
+      `With ${formatAedBudget(
+        budgetMax
+      )} and an investment horizon of ${horizon}, ` +
+      "we already have enough to narrow the field meaningfully. " +
+      "I’d focus on how entry price, handover timing and the eventual exit window work together.";
+  } else if (profileParts.length) {
+    acknowledgement =
+      "That gives me a useful starting point. " +
+      "I can narrow the options around " +
+      profileParts
+        .slice(0, 3)
+        .join(", ") +
+      ".";
+  } else {
+    acknowledgement =
+      "That helps narrow the direction.";
+  }
+
+  let question = null;
+
+  if (
+    String(goal || "")
+      .trim()
+      .toLowerCase() ===
+        "investment"
+  ) {
+    question =
+      "Within investment, are you more focused on rental income, capital growth, or a balance of both?";
+  } else if (!location) {
+    question =
+      "Are you open to Dubai, Abu Dhabi, or either?";
+  } else if (!offPlan) {
+    question =
+      "Are you open to off-plan, or do you prefer ready property?";
+  } else if (
+    !handoverTolerance
+  ) {
+    question =
+      "How long are you comfortable waiting for handover?";
+  }
+
+  return question
+    ? `${acknowledgement}
+
+${question}`
+    : acknowledgement;
 }
 
 
 export function buildGroundedFallback({
   route,
+  nextAction = null,
   evidencePack,
-  knowledgePack
+  knowledgePack,
+  interpretation = null,
+  activeMemory = []
 }) {
+  if (
+    nextAction ===
+      "PROFILE_UPDATE"
+  ) {
+    return buildProfileUpdateFallback({
+      interpretation,
+      activeMemory
+    });
+  }
   if (route === "compare") {
     const comparisonAnswer =
       buildProjectCompareAnswer(
@@ -477,4 +740,55 @@ export function buildGroundedFallback({
   return buildGenericAnswer(
     evidencePack
   );
+}
+
+
+// Fast path for a verified single-project overview.
+// Complex queries remain on the existing reasoning route.
+export function buildVerifiedProjectOverview({
+  message = "",
+  route = null,
+  nextAction = null,
+  context = null,
+  evidencePack = null,
+  knowledgePack = null
+} = {}) {
+  const slug = context?.entity?.primary_slug;
+
+  if (
+    route !== "page_question" ||
+    nextAction !== "KNOWLEDGE_QA" ||
+    context?.entity?.primary_type !== "project" ||
+    !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(String(slug || "")) ||
+    !(Number(evidencePack?.meta?.source_count) > 0)
+  ) return null;
+
+  const subject = slug.replace(/-/g, " ");
+  const query = String(message || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[.!?]+$/, "")
+    .trim();
+
+  if (!new Set([
+    `tell me about ${subject}`,
+    `tell me more about ${subject}`,
+    `give me an overview of ${subject}`
+  ]).has(query)) return null;
+
+  const answer = buildGroundedFallback({
+    route,
+    nextAction,
+    evidencePack,
+    knowledgePack
+  });
+
+  if (
+    typeof answer !== "string" ||
+    answer.length < 25 ||
+    /I don't have enough verified information/i.test(answer) ||
+    !answer.toLowerCase().includes(subject)
+  ) return null;
+
+  return answer;
 }

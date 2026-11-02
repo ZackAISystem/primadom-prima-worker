@@ -1,0 +1,16 @@
+{
+  "name": "primadom-prima-worker-live",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": false,
+  "routes": [
+    {
+      "pattern": "api.primadom.ai",
+      "custom_domain": true
+    }
+  ],
+  "vars": {
+    "PRIMA_PERSONA_GENERATIVE_A1": "1",
+    "PRIMA_SEARCH_PRODUCTION": "1"
+  }
+}

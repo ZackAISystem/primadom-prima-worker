@@ -28,68 +28,93 @@ function cleanSide(value = "") {
 }
 
 
-export function extractProjectComparisonTarget(
-  message = "",
-  currentProjectSlug = ""
+export function extractProjectComparisonPair(
+  message = ""
 ) {
   const raw =
     normalizePhrase(message);
-
-  const current =
-    slugToName(
-      currentProjectSlug
-    );
 
   const parts =
     raw.split(
       /\s+(?:vs\.?|versus|with)\s+/i
     );
 
-  if (parts.length >= 2) {
-    const left =
-      cleanSide(parts[0]);
-
-    const right =
-      cleanSide(
-        parts.slice(1).join(" ")
-      );
-
-    const leftNorm =
-      left.toLowerCase();
-
-    const rightNorm =
-      right.toLowerCase();
-
-    if (
-      current &&
-      (
-        leftNorm === current ||
-        leftNorm.endsWith(
-          ` ${current}`
-        )
-      ) &&
-      right
-    ) {
-      return right;
-    }
-
-    if (
-      current &&
-      (
-        rightNorm === current ||
-        rightNorm.endsWith(
-          ` ${current}`
-        )
-      ) &&
-      left
-    ) {
-      return left;
-    }
-
-    if (right) {
-      return right;
-    }
+  if (parts.length < 2) {
+    return null;
   }
 
-  return null;
+  const primary =
+    cleanSide(parts[0]);
+
+  const target =
+    cleanSide(
+      parts.slice(1).join(" ")
+    );
+
+  if (!primary || !target) {
+    return null;
+  }
+
+  return {
+    primary,
+    target
+  };
+}
+
+
+export function extractProjectComparisonTarget(
+  message = "",
+  currentProjectSlug = ""
+) {
+  const pair =
+    extractProjectComparisonPair(
+      message
+    );
+
+  if (!pair) {
+    return null;
+  }
+
+  const left =
+    pair.primary;
+
+  const right =
+    pair.target;
+
+  const current =
+    slugToName(
+      currentProjectSlug
+    );
+
+  const leftNorm =
+    left.toLowerCase();
+
+  const rightNorm =
+    right.toLowerCase();
+
+  if (
+    current &&
+    (
+      leftNorm === current ||
+      leftNorm.endsWith(
+        ` ${current}`
+      )
+    )
+  ) {
+    return right;
+  }
+
+  if (
+    current &&
+    (
+      rightNorm === current ||
+      rightNorm.endsWith(
+        ` ${current}`
+      )
+    )
+  ) {
+    return left;
+  }
+
+  return right;
 }

@@ -1,4 +1,17 @@
 import { resolveFollowUpReference } from "./follow-up.js";
+import contract from "../contracts/prima-persona-v1.json" with { type: "json" };
+import { classifyClearlyOffTopicRequest } from "./router.js";
+
+// Fallback facts derive from the canonical approved Persona contract.
+// A1 is the primary generator; this is only a safe local degradation path.
+const founder=contract.founder;
+const af=founder.approved_facts;
+const PERSONA_FOUNDER_DETAILS = `${founder.name} is ${founder.title}. His experience includes ${af.dubai_real_estate_experience_years} years in Dubai real estate, ${af.emaar_experience_years} years at Emaar, ${af.transactions} transactions and ${af.property_sales_aed} in property sales. Those are his achievements, not Prima's.`;
+const PERSONA_CREATOR_BRIEF = `Prima AI was developed by the Primadom team. ${founder.name} is its company's Founder & CEO, and his client-first philosophy helped shape the assistant. An exact launch date is not verified.`;
+const PERSONA_IDENTITY_FALLBACK = `I'm Prima AI, the personal AI real estate assistant inside Primadom.ai. I help people research UAE property, compare options and make better-informed decisions.`;
+const PERSONA_PLATFORM_FALLBACK = contract.brand.primadom_ai_user_facing;
+const PERSONA_COMPANY_FALLBACK = `${contract.company_truth.primadom_real_estate} It developed Primadom.ai, an AI-powered UAE real estate intelligence platform.`;
+const PERSONA_MISSION_FALLBACK = `Prima was developed by the Primadom team to help buyers make honest, data-informed and personalised UAE property decisions without sales pressure. Its exact creation date is not confirmed.`;
 
 
 function humanizeSlug(value) {
@@ -136,8 +149,7 @@ function buildCriticalFactGuard({
       .test(q)
   ) {
     return (
-      `I don't have verified live availability for ${projectName} right now. ` +
-      "If you'd like, I can ask a Primadom specialist to check the latest availability for you."
+      `Availability at ${projectName} can change as units are reserved or released; a current check is needed.`
     );
   }
 
@@ -169,8 +181,7 @@ function buildCriticalFactGuard({
     }
 
     return (
-      `I don't have a verified payment plan for ${projectName} right now. ` +
-      "If you'd like, I can ask a Primadom specialist to check the latest terms for you."
+      `Current payment terms for ${projectName} should be confirmed against the latest project offer.`
     );
   }
 
@@ -182,6 +193,7 @@ function buildCriticalFactGuard({
 export function buildLocalRouteAnswer({
   route,
   message = "",
+  personaIntent = null,
   knowledgePack = null,
   context = null
 }) {
@@ -190,15 +202,15 @@ export function buildLocalRouteAnswer({
       .trim()
       .toLowerCase();
 
-  const criticalFactAnswer =
-    buildCriticalFactGuard({
+  // These are property-fact fallbacks, not a second Persona router.
+  // Never let a payment/availability phrase mask Persona or mixed intents.
+  if (route === "exact_fact" || route === "page_question") {
+    const criticalFactAnswer = buildCriticalFactGuard({
       message,
       knowledgePack,
       context
     });
-
-  if (criticalFactAnswer) {
-    return criticalFactAnswer;
+    if (criticalFactAnswer) return criticalFactAnswer;
   }
 
 
@@ -293,31 +305,58 @@ export function buildLocalRouteAnswer({
       );
     }
 
+    const wantsOverview =
+      /\b(?:tell me more|what can you tell me|give me an? overview)\b/i
+        .test(
+          String(
+            message || ""
+          )
+        );
+
+    if (wantsOverview) {
+      return null;
+    }
+
     const name =
       reference.name ||
       reference.slug ||
       "that option";
 
+    // E1_8_SINGLE_PROJECT_FOLLOWUP_QUESTION_V1
+    // Confirm the selection without asking a second
+    // question before the existing project card and CTA.
     if (reference.type === "project") {
-      return (
-        `You're referring to ${name}. ` +
-        "What would you like me to check about it — " +
-        "price, handover, location, buyer fit or something else?"
-      );
+      const ordinalLabel =
+        String(message || "")
+          .match(
+            /\b(?:the\s+)?(first|second|third)\s+(?:one|project|option)\b/i
+          )?.[1]?.toLowerCase() || null;
+
+      return ordinalLabel
+        ? `The ${ordinalLabel} project is ${name}.`
+        : `You're referring to ${name}.`;
     }
+
 
     if (reference.type === "district") {
-      return (
-        `You're referring to ${name}. ` +
-        "What would you like to know about the area?"
-      );
+      const ordinal = String(message || "").match(
+        /\b(?:the\s+)?(first|second|third)\s+(?:one|developer|district|area|option)\b/i
+      )?.[1]?.toLowerCase();
+
+      return ordinal
+        ? `The ${ordinal} district is ${name}.`
+        : `You're referring to ${name}.`;
     }
 
+
     if (reference.type === "developer") {
-      return (
-        `You're referring to ${name}. ` +
-        "What would you like to know about the developer?"
-      );
+      const ordinal = String(message || "").match(
+        /\b(?:the\s+)?(first|second|third)\s+(?:one|developer|district|area|option)\b/i
+      )?.[1]?.toLowerCase();
+
+      return ordinal
+        ? `The ${ordinal} developer is ${name}.`
+        : `You're referring to ${name}.`;
     }
 
     return (
@@ -331,70 +370,151 @@ export function buildLocalRouteAnswer({
     return (
       "I don't have verified live Dubai-wide market figures connected right now, " +
       "so I won't guess current transaction, demand, price-trend or rental data. " +
-      "I can still help with verified Primadom knowledge, or connect you with a " +
-      "Primadom specialist if you need a current market check."
+      // Commercial invitations belong exclusively to the Funnel.
+      // This neutral fallback must not offer advisor contact on its own.
+      "I can still help you understand the buying process and the " +
+      "questions to verify before making a decision."
+    );
+  }
+
+  // PRIMA_GREETING_REGRESSION_FIX_V1
+  if (
+    route === "persona_question" &&
+    /^(?:hi|hello|hey|good morning|good afternoon|good evening)(?:[\s,!.:-]+prima(?:\s+ai)?)?[\s!.,?👋]*$/iu.test(q)
+  ) {
+    return (
+      "Hi! 👋 What would you like to explore in UAE real estate today?"
     );
   }
 
   if (route === "unsupported") {
-    return (
-      "That's a little outside my area 😄 I'm much more useful when it comes to UAE real estate. " +
-      "I can help with projects, areas, developers, comparisons, budgets or finding the right property for you."
-    );
+    const kind = classifyClearlyOffTopicRequest(message);
+    // A brief acknowledgement is enough for clear off-topic turns;
+    // don't promote every unrelated question into a property sales pitch.
+    if (kind === "weather") {
+      return "I don't have a live weather forecast to verify current conditions. A weather service will give you a more reliable answer.";
+    }
+    if (kind === "cooking") {
+      return "Cooking isn't my specialty — I focus on UAE real estate. A dedicated cooking guide would be more useful for recipes and techniques.";
+    }
+    if (kind === "personal_boundary") {
+      return "I'm here as a UAE real estate assistant, not a romantic or intimate companion. We can return to property questions whenever you like.";
+    }
+    return "That's outside my UAE property specialty. I'm happy to help when you have a real estate question.";
   }
 
   if (route !== "persona_question") {
     return null;
   }
 
+  // Local Persona is a SAFE FALLBACK, never the main conversational engine.
+  // A1 runs before this module in index.js; it owns novel, multilingual,
+  // multi-turn generative answers when enabled. Do not create question catalogs.
+  // This fallback uses the semantic intent already chosen by Core/A1 where
+  // available. Only a few unambiguous legacy core requests are recognized here.
+
+  // Non-impersonation and investment claims are trust boundaries. These must
+  // take precedence over unrelated semantic Persona labels on the fallback path.
   if (
-    /\b(what is primadom|what's primadom|what is primadom\.ai|about primadom|about primadom\.ai)\b/i
-      .test(q)
+    /\b(?:guarantee|guaranteed|promise)\b/i.test(q) &&
+    /\b(?:profit|make money|investment|investing|roi|returns?|yield|appreciation|rental income)\b/i.test(q)
   ) {
-    return (
-      "Primadom.ai is an AI-native UAE real estate intelligence platform combining " +
-      "market knowledge, intelligent search and Prima AI to help buyers and investors " +
-      "understand the market and make better property decisions."
-    );
+    return "No. Neither Prima nor Primadom can guarantee investment profits, ROI, rental yield or future appreciation. I can help evaluate verified facts, risks and trade-offs instead.";
   }
 
-  if (
-    /\b(who created you|who built you|who made you|creator|founder|thredeesh)\b/i
-      .test(q)
-  ) {
-    return (
-      "Prima AI was created under the direction of Thredeesh Mannambeth Karyamkandy, " +
-      "Founder & CEO of Primadom Real Estate. His experience and principles around " +
-      "honesty, data and personalised advice helped shape how I'm designed to work."
-    );
+  if (/\bare you (?:thredeesh|the founder)\b/i.test(q)) {
+    return "No — I'm Prima, Primadom.ai's AI real estate advisor, not Primadom's founder.";
+  }
+  if (/\bare you (?:a )?(?:human|real person|broker)\b/i.test(q)) {
+    return "No — I'm Prima, an AI real estate advisor on Primadom.ai, not a human broker.";
   }
 
-  if (
-    /\b(values|principles|how do you work|how do you make decisions|your approach)\b/i
-      .test(q)
-  ) {
-    return (
-      "My core principles are honesty first, data over opinion, client goals " +
-      "above everything and long-term thinking. I aim to be precise, useful " +
-      "and commercially aware without being pushy."
-    );
+  // Canonical intent labels belong to the semantic layer, not this file.
+  // Approved founder facts are local only as failure-mode grounding; contract
+  // consolidation with persona-runtime and A1 belongs to their later files.
+  switch (personaIntent) {
+    case "founder_career":
+    case "founder_experience":
+      return "Thredeesh has 16+ years of Dubai real estate experience, including 13+ years at Emaar. His record includes 2,500+ transactions and AED 4B+ in property sales. I don't have a verified position-by-position career timeline, so I won't invent one.";
+
+    case "founder_relevance":
+      return "His 16+ years in Dubai real estate, including 13+ at Emaar and 2,500+ transactions, give him extensive practical exposure to property decisions. That experience helped shape Prima's focus on evidence, tailored guidance and long-term client relationships; it doesn't guarantee investment outcomes.";
+
+    case "founder_profile":
+      return PERSONA_FOUNDER_DETAILS;
+
+    case "prima_creator":
+      return PERSONA_CREATOR_BRIEF;
+
+    case "prima_identity":
+      return PERSONA_IDENTITY_FALLBACK;
+
+    case "primadom_platform":
+      return PERSONA_PLATFORM_FALLBACK;
+
+    case "primadom_company":
+      return PERSONA_COMPANY_FALLBACK;
+
+    case "persona_principles":
+      return `My principles are honesty, verified data, client-first advice, long-term thinking, personalisation, market knowledge and support beyond the transaction.`;
+
+    case "persona_capabilities":
+      return "I can explain verified UAE property facts, help you research projects, developers and districts, compare options and narrow choices around your priorities. A Primadom specialist can help when you want human assistance.";
+
+    case "persona_scope":
+      return "I specialize in UAE real estate: projects, developers, districts, property searches, comparisons and property decisions based on your goals and budget.";
+
+    case "ambiguous":
+      break; // Use the actual message topic rather than forcing a clarification.
   }
 
-  if (
-    /\b(what can you do|what can you help|how can you help|your capabilities)\b/i
-      .test(q)
-  ) {
-    return (
-      "I can answer questions about UAE projects, developers and areas, compare " +
-      "options, explain verified project facts, help narrow choices to your " +
-      "budget and goals, discuss market questions and help you connect with a " +
-      "Primadom advisor when useful."
-    );
+  // Legacy zero-model fallback for a few explicitly unambiguous subjects.
+  // This is not a parallel semantic router; unknown paraphrases go to A1,
+  // or receive an honest clarification if generation is unavailable.
+  if (/^(?:who are you|what are you|what is prima(?: ai)?|who is prima(?: ai)?)\s*[?.!]*$/i.test(q)) {
+    return PERSONA_IDENTITY_FALLBACK;
   }
 
-  return (
-    "I'm Prima, an AI real estate advisor focused on the UAE market. " +
-    "I help buyers and investors understand their options, compare properties " +
-    "and make more confident property decisions."
-  );
+  if (/^(?:what is|what's)\s+primadom\.ai\s*[?.!]*$/i.test(q)) {
+    return PERSONA_PLATFORM_FALLBACK;
+  }
+
+  if (/^(?:who (?:created|built|made) (?:you|prima(?: ai)?)|who is (?:the )?creator of prima(?: ai)?)\s*[?.!]*$/i.test(q)) {
+    return PERSONA_CREATOR_BRIEF;
+  }
+
+  // On an A1 failure, give a truthful topical fallback rather than a generic
+  // platform definition. These few verified boundaries are not the main answer engine.
+  if (/\b(?:inspir(?:ed|ation|e)?|why.*(?:creat|develop)|vision behind)\b/i.test(q) &&
+      /\b(?:founder|thredeesh|prima)\b/i.test(q)) {
+    return founder.vision_for_prima_v1;
+  }
+  if (/\b(?:after[- ]sales|post[- ]purchase|after (?:the |a )?(?:sale|purchase)|after someone buys)\b/i.test(q)) {
+    return contract.company_truth.after_sales_philosophy_v1;
+  }
+  if (/\b(?:knowledge|sources?|information)\b/i.test(q) &&
+      /\b(?:where|come from|basing|based on|rely on)\b/i.test(q)) {
+    return contract.brand.knowledge_network_v1.client_value_v1 + " I use relevant available verified facts, not necessarily live data.";
+  }
+  // On a paid A1 failure, still answer the identifiable topic safely.
+  const priorTurns=Array.isArray(context?.conversation?.recent_messages)
+    ? context.conversation.recent_messages.slice(-3).map(m=>String(m?.content||"")).join(" ") : "";
+  if (/\b(?:he|him|his)\b/i.test(q) &&
+      /\b(?:thredeesh|founder|emaar)\b/i.test(priorTurns))
+    return PERSONA_FOUNDER_DETAILS;
+  // These broad subject cues are not a catalogue of responses to questions.
+  if (/\b(?:thredeesh|mannambeth|founder|emaar|his career|his experience)\b/i.test(q))
+    return PERSONA_FOUNDER_DETAILS;
+  if (/\b(?:primadom\.ai|platform|knowledge (?:base|network))\b/i.test(q))
+    return PERSONA_PLATFORM_FALLBACK;
+  if (/\b(?:primadom|company|agency)\b/i.test(q))
+    return PERSONA_COMPANY_FALLBACK;
+  if (/\b(?:why|mission|purpose|created|origin|developed)\b/i.test(q))
+    return PERSONA_MISSION_FALLBACK;
+  if (/\b(?:principles|values|ethics|philosophy)\b/i.test(q))
+    return "I follow seven principles: honesty, evidence, client-first decisions, long-term thinking, personalisation, market knowledge and support beyond the transaction.";
+  if (/\b(?:capabilities|help|can you do|expertise|market)\b/i.test(q))
+    return "I can help you research UAE property projects, developers, districts and buyer scenarios, compare options and assess risks using verified information. Live data needs separate verification.";
+  if (/\b(?:prima|you|your)\b/i.test(q)) return PERSONA_IDENTITY_FALLBACK;
+  return "I can explain Prima AI and the Primadom real estate platform, including their purpose and the team behind them.";
 }

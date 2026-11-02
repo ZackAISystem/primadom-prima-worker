@@ -274,8 +274,38 @@ export function buildKnowledgePlan({
   message = "",
   context = {}
 } = {}) {
+  const interpretedTasks =
+    Array.isArray(
+      context
+        ?.request_interpretation
+        ?.tasks
+    )
+      ? context
+          .request_interpretation
+          .tasks
+      : [];
+
+  const interpretedTask =
+    interpretedTasks.find(
+      task =>
+        task?.route === route
+    ) ||
+    interpretedTasks[0] ||
+    null;
+
+  const interpretedTopics =
+    Array.isArray(
+      interpretedTask?.topics
+    )
+      ? interpretedTask
+          .topics
+          .filter(Boolean)
+      : [];
+
   const topics =
-    detectTopics(message);
+    interpretedTopics.length > 0
+      ? uniq(interpretedTopics)
+      : detectTopics(message);
 
   const domain =
     currentDomain(context);
@@ -322,7 +352,10 @@ export function buildKnowledgePlan({
   // Current page first. Related knowledge only if useful.
   // -------------------------------------------------------
 
-  if (route === "page_question") {
+  if (
+    route === "page_question" ||
+    route === "follow_up"
+  ) {
     plan.needs = uniq([
       ...baseCurrentEntityNeeds(context),
       ...topicNeeds(topics)

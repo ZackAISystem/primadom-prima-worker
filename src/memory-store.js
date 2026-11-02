@@ -1,8 +1,12 @@
 import {
-  supabaseInsert,
+  supabaseInsertIdempotentEvent,
   supabaseSelect,
   supabaseRpc
 } from "./supabase.js";
+
+import {
+  normalizeMemoryFacts
+} from "./memory.js";
 
 
 const UUID_PATTERN =
@@ -34,7 +38,10 @@ export async function persistMemoryFacts(
 ) {
   const saved = [];
 
-  for (const fact of facts) {
+  for (
+    const fact of
+    normalizeMemoryFacts(facts)
+  ) {
     const result =
       await supabaseRpc(
         env,
@@ -72,7 +79,7 @@ export async function persistMemoryFacts(
       );
 
       try {
-        await supabaseInsert(
+        await supabaseInsertIdempotentEvent(
           env,
           "conversation_events",
           {

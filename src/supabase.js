@@ -74,6 +74,200 @@ export async function supabaseInsert(
   return text ? JSON.parse(text) : [];
 }
 
+
+export async function supabaseInsertIdempotentMessage(
+  env,
+  table,
+  body,
+  select = "*"
+) {
+  const res = await fetch(
+    `${env.SUPABASE_REST_URL}/${table}?select=${encodeURIComponent(select)}`,
+    {
+      method: "POST",
+
+      headers: {
+        ...headers(env),
+        prefer:
+          "return=representation"
+      },
+
+      body:
+        JSON.stringify(body)
+    }
+  );
+
+  const text =
+    await res.text();
+
+  if (res.ok) {
+    return text
+      ? JSON.parse(text)
+      : [];
+  }
+
+  let errorBody = null;
+
+  try {
+    errorBody =
+      text
+        ? JSON.parse(text)
+        : null;
+  } catch {
+    errorBody = null;
+  }
+
+  const isTurnDuplicate =
+    table === "messages" &&
+    Boolean(body?.conversation_id) &&
+    Boolean(body?.turn_id) &&
+    Boolean(body?.role) &&
+    res.status === 409 &&
+    errorBody?.code === "23505" &&
+    text.includes(
+      "messages_conversation_turn_role_uidx"
+    );
+
+  if (!isTurnDuplicate) {
+    throw new Error(
+      `supabase_idempotent_message_insert_failed:${res.status}:${text}`
+    );
+  }
+
+  /*
+    PostgreSQL unique index is the concurrency authority.
+
+    Normal traffic:
+      one INSERT only.
+
+    Retry / parallel duplicate:
+      unique violation -> fetch canonical existing row.
+  */
+  const rows =
+    await supabaseSelect(
+      env,
+      table,
+      (
+        `conversation_id=eq.${encodeURIComponent(body.conversation_id)}` +
+        `&turn_id=eq.${encodeURIComponent(body.turn_id)}` +
+        `&role=eq.${encodeURIComponent(body.role)}` +
+        `&select=${encodeURIComponent(select)}` +
+        `&limit=1`
+      )
+    );
+
+  console.log(
+    "prima_message_duplicate_ignored",
+    JSON.stringify({
+      conversation_id:
+        body.conversation_id,
+
+      turn_id:
+        body.turn_id,
+
+      turn_seq:
+        body?.turn_seq ?? null,
+
+      role:
+        body.role
+    })
+  );
+
+  return rows;
+}
+
+
+
+export async function supabaseInsertIdempotentEvent(
+  env,
+  table,
+  body,
+  select = "*"
+) {
+  const res = await fetch(
+    `${env.SUPABASE_REST_URL}/${table}?select=${encodeURIComponent(select)}`,
+    {
+      method: "POST",
+
+      headers: {
+        ...headers(env),
+        prefer:
+          "return=representation"
+      },
+
+      body:
+        JSON.stringify(body)
+    }
+  );
+
+  const text =
+    await res.text();
+
+  if (res.ok) {
+    return text
+      ? JSON.parse(text)
+      : [];
+  }
+
+  let errorBody = null;
+
+  try {
+    errorBody =
+      text
+        ? JSON.parse(text)
+        : null;
+  } catch {
+    errorBody = null;
+  }
+
+  const idempotentEventNames =
+    new Set([
+      "message_routed",
+      "lead_contact_captured",
+      "memory_fact_captured"
+    ]);
+
+  const isExpectedDuplicate =
+    table === "conversation_events" &&
+    Boolean(body?.message_id) &&
+    idempotentEventNames.has(
+      body?.event_name
+    ) &&
+    res.status === 409 &&
+    errorBody?.code === "23505";
+
+  if (isExpectedDuplicate) {
+    console.log(
+      "prima_event_duplicate_ignored",
+      JSON.stringify({
+        conversation_id:
+          body?.conversation_id ||
+          null,
+
+        message_id:
+          body?.message_id ||
+          null,
+
+        event_name:
+          body?.event_name ||
+          null,
+
+        fact_key:
+          body?.event_data
+            ?.fact_key ||
+          null
+      })
+    );
+
+    return [];
+  }
+
+  throw new Error(
+    `supabase_idempotent_event_insert_failed:${res.status}:${text}`
+  );
+}
+
+
 export async function supabaseUpdate(
   env,
   table,
@@ -100,6 +294,44 @@ export async function supabaseUpdate(
     );
   }
 }
+
+
+export async function supabaseUpdateReturning(
+  env,
+  table,
+  query,
+  body
+) {
+  const res = await fetch(
+    `${env.SUPABASE_REST_URL}/${table}?${query}`,
+    {
+      method: "PATCH",
+
+      headers: {
+        ...headers(env),
+        prefer:
+          "return=representation"
+      },
+
+      body:
+        JSON.stringify(body)
+    }
+  );
+
+  const text =
+    await res.text();
+
+  if (!res.ok) {
+    throw new Error(
+      `supabase_update_returning_failed:${res.status}:${text}`
+    );
+  }
+
+  return text
+    ? JSON.parse(text)
+    : [];
+}
+
 
 export async function supabaseSelect(
   env,
@@ -154,6 +386,45 @@ export async function supabaseRpc(
 
     throw new Error(
       `supabase_rpc_failed:${response.status}:${text}`
+    );
+  }
+
+  return response.json();
+}
+
+
+export async function supabasePublicRpc(
+  env,
+  functionName,
+  payload = {}
+) {
+  const response =
+    await fetchReadWithRetry(
+      `${env.SUPABASE_REST_URL}/rpc/${functionName}`,
+      {
+        method: "POST",
+
+        headers: {
+          ...headers(env),
+          "accept-profile":
+            "public",
+          "content-profile":
+            "public",
+          "content-type":
+            "application/json"
+        },
+
+        body:
+          JSON.stringify(payload)
+      }
+    );
+
+  if (!response.ok) {
+    const body =
+      await response.text();
+
+    throw new Error(
+      `supabase_public_rpc_failed:${response.status}:${body}`
     );
   }
 

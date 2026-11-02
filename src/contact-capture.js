@@ -1,3 +1,5 @@
+import { parsePhoneNumberFromString } from "libphonenumber-js/max";
+
 function activeFactValue(
   activeMemory,
   factKey
@@ -64,6 +66,13 @@ function explicitContactChannel(
   }
 
   if (
+    /\bemail\b|\be-mail\b/i
+      .test(text)
+  ) {
+    return "email";
+  }
+
+  if (
     /\bphone\b|\bcall me\b/i
       .test(text)
   ) {
@@ -74,11 +83,19 @@ function explicitContactChannel(
 }
 
 
+// This only enables the existing H validation path; it never bypasses
+// phone/email parsing, opt-out rules, Memory persistence or Lead RPC.
+export function hasExplicitVoluntaryContactCue(message = "") {
+  const text = String(message || "");
+  return /\b(?:my|here(?:'s| is)|this is my|you can reach me (?:at|on)|please (?:email|call|whatsapp) me (?:at|on))\b[\s\S]{0,65}\b(?:phone|whats\s*app|whatsapp|email|e-mail|number|address)\b/i.test(text) ||
+    /\b(?:you can reach me|email me|whatsapp me)\s+(?:at|on)\b/i.test(text);
+}
+
 function hasContactCue(
   message = ""
 ) {
   return (
-    /\b(phone|whats\s*app|whatsapp|number|reach me|call me|contact me)\b/i
+    /\b(phone|whats\s*app|whatsapp|number|email|e-mail|reach me|call me|contact me)\b/i
       .test(
         String(message)
       )
@@ -86,117 +103,125 @@ function hasContactCue(
 }
 
 
-function normalizePhoneCandidate(
-  raw
-) {
-  const source =
-    String(raw || "")
-      .trim();
+// H32_GLOBAL_PHONE_NORMALIZATION_V1
+// No country is inferred from property location or user IP.
+function normalizePhoneCandidate(raw) {
+  const compact = String(raw || "")
+    .replace(/[\s().()-]/g, "");
 
-  const digits =
-    source.replace(
-      /\D/g,
-      ""
-    );
+  const digits = compact.replace(/\D/g, "");
+
+  let international = null;
+
+  if (compact.startsWith("+")) {
+    international = `+${digits}`;
+  } else if (compact.startsWith("00")) {
+    international = `+${digits.slice(2)}`;
+  } else if (
+    /^\d{11,15}$/.test(compact) &&
+    !compact.startsWith("0")
+  ) {
+    // Try an explicit calling-code prefix without '+'.
+    // Accept only if international validation succeeds.
+    international = `+${digits}`;
+  }
+
+  if (!international) return null;
+
+  const internationalDigits = international.slice(1);
 
   if (
-    digits.length < 8 ||
-    digits.length > 15
+    internationalDigits.length < 8 ||
+    internationalDigits.length > 15
   ) {
     return null;
   }
 
-  if (
-    source.startsWith("+")
-  ) {
-    return `+${digits}`;
+  try {
+    const parsed = parsePhoneNumberFromString(
+      international
+    );
+
+    return parsed?.isValid()
+      ? parsed.number
+      : null;
+  } catch {
+    return null;
   }
-
-  return digits;
 }
-
 
 function extractPhone(
   message,
   {
-    allowBare = false
+    allowBare = false,
+    contactChannel = null
   } = {}
 ) {
-  const text =
-    String(message || "");
+  const text = String(message || "");
 
-  const candidates =
-    text.match(
-      /(?:\+\d[\d\s().-]{6,}\d|\b0\d[\d\s().-]{7,}\d\b)/g
-    ) || [];
+  // International prefixes, plus sign, brackets,
+  // hyphens, spaces, or unprefixed digit sequences.
+  const candidates = text.match(
+    /(?:\+\s*|00\s*)\d[\d\s().-]{5,}\d|\b\d[\d\s().-]{8,}\d\b/g
+  ) || [];
 
   for (const candidate of candidates) {
-    const normalized =
-      normalizePhoneCandidate(
-        candidate
-      );
+    const raw = candidate.trim();
 
-    if (!normalized) {
+    const explicitInternational =
+      raw.startsWith("+") ||
+      raw.startsWith("00");
+
+    if (
+      !explicitInternational &&
+      !allowBare &&
+      !hasContactCue(text)
+    ) {
       continue;
     }
 
-    if (
-      candidate
-        .trim()
-        .startsWith("+")
-    ) {
-      return {
-        raw:
-          candidate,
-        normalized
-      };
-    }
+    const normalized =
+      normalizePhoneCandidate(raw);
 
-    if (
-      allowBare ||
-      hasContactCue(text)
-    ) {
-      return {
-        raw:
-          candidate,
-        normalized
-      };
-    }
-  }
-
-  /*
-    After an accepted handoff, a user may
-    reply with digits only.
-  */
-  if (allowBare) {
-    const digitsOnly =
-      text.match(
-        /^\s*(\d[\d\s().-]{6,}\d)\s*$/
-      );
-
-    if (digitsOnly?.[1]) {
-      const normalized =
-        normalizePhoneCandidate(
-          digitsOnly[1]
-        );
-
-      if (normalized) {
-        return {
-          raw:
-            digitsOnly[1],
-          normalized
-        };
-      }
+    if (normalized) {
+      return { raw, normalized };
     }
   }
 
   return null;
 }
 
+function extractEmail(
+  message
+) {
+  const text =
+    String(message || "");
+
+  const match =
+    text.match(
+      /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,63}\b/i
+    );
+
+  if (!match?.[0]) {
+    return null;
+  }
+
+  return {
+    raw:
+      match[0],
+
+    normalized:
+      match[0]
+        .trim()
+        .toLowerCase()
+  };
+}
+
 
 function isContactOnlyMessage(
   message,
-  rawPhone
+  rawPhone,
+  rawEmail
 ) {
   let text =
     String(message || "");
@@ -209,10 +234,18 @@ function isContactOnlyMessage(
       );
   }
 
+  if (rawEmail) {
+    text =
+      text.replace(
+        rawEmail,
+        " "
+      );
+  }
+
   text =
     text
       .replace(
-        /\b(my|phone|whats\s*app|whatsapp|number|is|at|on|reach|me|call|contact|please)\b/gi,
+        /\b(my|phone|whats\s*app|whatsapp|number|email|e-mail|is|at|on|reach|me|call|contact|please)\b/gi,
         " "
       )
       .replace(
@@ -245,6 +278,7 @@ function emptyDecision() {
 export function evaluateContactCapture({
   message = "",
   activeMemory = [],
+  currentFacts = [],
   funnelDecision = null
 } = {}) {
   const funnelState =
@@ -262,11 +296,42 @@ export function evaluateContactCapture({
       message,
       {
         allowBare:
-          handoffAccepted
+          handoffAccepted,
+        contactChannel:
+          explicitContactChannel(message)
       }
     );
 
-  if (!phone) {
+  const email =
+    extractEmail(
+      message
+    );
+
+  if (
+    !phone &&
+    !email
+  ) {
+    // H3_INVALID_CONTACT_CLARIFICATION_V1
+    // A rejected number must not create a lead.
+    const phoneAttempt =
+      /(?:\+\s*\d[\d\s().()-]{3,}\d|\b00\d[\d\s().()-]{5,}\d\b|\b\d[\d\s().()-]{7,}\d\b)/
+        .test(String(message));
+
+    if (
+      phoneAttempt &&
+      (
+        handoffAccepted ||
+        hasContactCue(message)
+      )
+    ) {
+      return {
+        ...emptyDecision(),
+        response_type: "answer",
+        answer_override:
+          "That number doesn't look valid for the contact method you chose. Could you check it and send the correct number with its country code? We can continue here in the meantime."
+      };
+    }
+
     return emptyDecision();
   }
 
@@ -277,15 +342,21 @@ export function evaluateContactCapture({
 
   const contactChannel =
     explicitChannel ||
-    "phone";
+    (
+      phone
+        ? "phone"
+        : "email"
+    );
 
   const source =
     handoffAccepted
       ? "accepted_handoff"
       : "voluntary_contact";
 
-  const memoryFacts = [
-    {
+  const memoryFacts = [];
+
+  if (phone) {
+    memoryFacts.push({
       fact_key:
         "contact_phone",
 
@@ -294,8 +365,21 @@ export function evaluateContactCapture({
 
       confidence:
         0.995
-    }
-  ];
+    });
+  }
+
+  if (email) {
+    memoryFacts.push({
+      fact_key:
+        "contact_email",
+
+      fact_value:
+        email.normalized,
+
+      confidence:
+        0.995
+    });
+  }
 
   /*
     Preferred channel is stored only when
@@ -342,11 +426,50 @@ export function evaluateContactCapture({
       0.995
   });
 
+  // H33_PERSONAL_CONTACT_ACK_V1
+  // Display original formatting; canonical memory stays unchanged.
+  const rawName = activeFactValue(
+    [...activeMemory, ...currentFacts],
+    "user_name"
+  );
+
+  const name =
+    typeof rawName === "string"
+      ? rawName.trim()
+      : "";
+
+  const safeName =
+    name.length <= 60 &&
+    /^[\p{L}][\p{L}\p{M} .'-]*$/u.test(name)
+      ? name
+      : "";
+
+  const contactDisplay =
+    phone?.raw
+      ? `your number as ${phone.raw.trim()}`
+      : `your email address as ${String(email?.raw || email?.normalized || "").trim()}`;
+
+  const contactAcknowledgement =
+    `Thank you${safeName ? `, ${safeName}` : ""} — ` +
+    `I’ve saved ${contactDisplay}. ` +
+    "The Primadom team can follow up with you about the options we’ve discussed. " +
+    "I’m here if you’d like to continue exploring.";
+
   const contactOnly =
     isContactOnlyMessage(
       message,
-      phone.raw
+      phone?.raw,
+      email?.raw
     );
+
+  // A client may initiate the handoff in their FIRST message, with a name,
+  // a contact and a requested viewing. This is a contact action, not a
+  // request to compare or explain property facts. A real mixed information
+  // question must still receive its factual answer.
+  const directContactAction =
+    /\b(?:please\s+)?(?:contact|call|whatsapp|email|message)\s+me\b/i.test(message) &&
+    !/\b(?:what|which|why|how|are there|is there|compare|tell me about|explain)\b/i.test(message);
+  const shouldAcknowledge = handoffAccepted || contactOnly || directContactAction;
 
   return {
     captured: true,
@@ -356,16 +479,14 @@ export function evaluateContactCapture({
 
     answer_override:
       (
-        handoffAccepted ||
-        contactOnly
+        shouldAcknowledge
       )
-        ? "Thank you — I’ve got it."
+        ? contactAcknowledgement
         : null,
 
     follow_up:
       (
-        handoffAccepted ||
-        contactOnly
+        shouldAcknowledge
       )
         ? "Is there a convenient time for a Primadom specialist to reach you?"
         : null,
@@ -385,7 +506,7 @@ export function evaluateContactCapture({
       memoryFacts,
 
     /*
-      Deliberately NO raw phone here.
+      Deliberately NO raw contact here.
       The canonical number lives in
       memory_facts only.
     */

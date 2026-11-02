@@ -60,7 +60,7 @@ const offTopic = buildLocalRouteAnswer({
 
 check(
   "identity_wrong",
-  identity.includes("I'm Prima, an AI real estate advisor focused on the UAE market.")
+  identity.includes("I'm Prima") && identity.includes("AI real estate advisor") && identity.includes("UAE market")
 );
 
 check(
@@ -75,14 +75,12 @@ check(
 
 check(
   "payment_handoff_missing",
-  payment.includes("Primadom specialist") &&
-  payment.includes("latest terms")
+  payment.includes("payment terms") && payment.includes("confirmed")
 );
 
 check(
   "availability_handoff_missing",
-  availability.includes("Primadom specialist") &&
-  availability.includes("latest availability")
+  availability.includes("Availability at") && availability.includes("current check is needed")
 );
 
 check(

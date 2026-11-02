@@ -52,38 +52,110 @@ async function resolveExactFact(
   context,
   route
 ) {
-  const startedAt = Date.now();
+  const startedAt =
+    Date.now();
 
   const page =
-    buildContextPage(context);
+    buildContextPage(
+      context
+    );
 
   if (!page.page_id) {
     return null;
   }
 
-  const blocks = await supabaseSelect(
-    env,
-    "knowledge_blocks_v1",
-    [
-      "select=block_key,block_index,block_family,final_block_json,content_version_id",
-      `page_id=eq.${encodeURIComponent(page.page_id)}`,
-      "block_family=eq.key_facts",
-      "limit=1"
-    ].join("&")
-  );
+  const projectSlug =
+    page.primary_entity_type ===
+      "project"
+      ? page.primary_entity_slug
+      : null;
+
+  let blocks = [];
+  let relations = [];
+  let databaseCalls = 1;
+  let retrievalMode =
+    "exact_fact_fast_path";
+
+  /*
+    Project exact facts need not only key_facts.
+
+    Some canonical facts such as location and developer
+    live in the verified project relation.
+
+    Reuse the existing Knowledge Bundle RPC so project
+    key_facts + relation arrive in ONE database call.
+  */
+  if (projectSlug) {
+    const bundle =
+      await supabaseRpc(
+        env,
+        "resolve_knowledge_bundle_v2",
+        {
+          p_page_id:
+            page.page_id,
+
+          p_project_slug:
+            projectSlug,
+
+          p_language_code:
+            page.language_code ||
+            "en",
+
+          p_current_families: [
+            "key_facts"
+          ],
+
+          p_district_families: [],
+
+          p_conversation_id:
+            null
+        }
+      );
+
+    blocks =
+      Array.isArray(
+        bundle?.current_blocks
+      )
+        ? bundle.current_blocks
+        : [];
+
+    if (bundle?.relation) {
+      relations = [
+        bundle.relation
+      ];
+    }
+
+    retrievalMode =
+      "exact_fact_project_bundle_v2";
+  } else {
+    blocks =
+      await supabaseSelect(
+        env,
+        "knowledge_blocks_v1",
+        [
+          "select=block_key,block_index,block_family,final_block_json,content_version_id",
+          `page_id=eq.${encodeURIComponent(
+            page.page_id
+          )}`,
+          "block_family=eq.key_facts",
+          "limit=1"
+        ].join("&")
+      );
+  }
 
   return {
     version:
       "UniversalContentResolverV1-FAST",
 
     resolved:
-      blocks.length > 0,
+      blocks.length > 0 ||
+      relations.length > 0,
 
     page,
 
     blocks,
 
-    relations: [],
+    relations,
 
     planner: null,
     adapter: null,
@@ -97,22 +169,25 @@ async function resolveExactFact(
       blocks_loaded:
         blocks.length,
 
-      relations_loaded: 0,
+      relations_loaded:
+        relations.length,
 
       used_database:
-        blocks.length > 0,
+        blocks.length > 0 ||
+        relations.length > 0,
 
       resolver_latency_ms:
-        Date.now() - startedAt,
+        Date.now() -
+        startedAt,
 
-      database_calls: 1,
+      database_calls:
+        databaseCalls,
 
       retrieval_mode:
-        "exact_fact_fast_path"
+        retrievalMode
     }
   };
 }
-
 
 function mergeBundleMemory(
   persistedMemory = [],
@@ -408,13 +483,38 @@ async function resolveProjectCompareKnowledge(
       ? context
           ?.entity
           ?.primary_slug || null
-      : null;
+      : (
+          context
+            ?.working_entity
+            ?.type === "project"
+            ? context
+                ?.working_entity
+                ?.slug || null
+            : null
+        );
 
   if (!currentSlug) {
     return null;
   }
 
+  const workingComparisonTarget =
+    typeof context
+      ?.working_comparison_target === "string"
+      ? context
+          .working_comparison_target
+          .trim()
+      : (
+          context
+            ?.working_comparison_target
+            ?.name ||
+          context
+            ?.working_comparison_target
+            ?.slug ||
+          null
+        );
+
   const targetQuery =
+    workingComparisonTarget ||
     extractProjectComparisonTarget(
       message,
       currentSlug
@@ -776,8 +876,12 @@ export async function resolveKnowledge(
 
   if (
     route === "compare" &&
-    context?.entity
-      ?.primary_type === "project"
+    (
+      context?.entity
+        ?.primary_type === "project" ||
+      context?.working_entity
+        ?.type === "project"
+    )
   ) {
     const comparison =
       await resolveProjectCompareKnowledge(
