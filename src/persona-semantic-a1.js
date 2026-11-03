@@ -142,8 +142,13 @@ export function requiresStructuredBuyerUnderstanding({message,route}) {
   if (!["persona_question", "unsupported"].includes(route)) return false;
   const q = String(message || "");
   const buyerSubject = /\b(?:properties|property|projects?|apartments?|villas?|townhouses?|penthouses?|bedrooms?|\d\s*br|off[ -]?plan|invest(?:ment|ing|or)?|roi|rental|yield|buy|purchase|budget|aed|million|districts?|areas?|communities|dubai\s+(?:hills|marina|creek|land)|jvc|jlt|palm\s+jumeirah)\b/i.test(q);
-  const taskSignal = /\b(?:find|show|select|search|list|compare|recommend|options|opportunities|looking|need|want|interested|thinking|considering|tell\s+me\s+about|help\s+me|can\s+you\s+(?:tell|help))\b/i.test(q);
-  return buyerSubject && taskSignal;
+  // Topic words are not evidence of a search request. Keep general Persona
+  // capability/philosophy questions on Persona; delegate actionable buyer
+  // requests to the existing full Interpreter, not a response template.
+  const actionable = /\b(?:find|show|select|search|list|compare|recommend|shortlist|looking\s+for|need|want|buy|purchase)\b/i.test(q);
+  const concreteOptions = /\b(?:options|opportunities)\b/i.test(q) &&
+    /\b(?:in\s+(?:dubai|jvc|jlt|marina|hills|creek|palm)|under\s+(?:aed|\d)|up\s+to\s+(?:aed|\d)|\d+\s*(?:bedrooms?|br)|apartments?|villas?|townhouses?|projects?|properties)\b/i.test(q);
+  return buyerSubject && (actionable || concreteOptions);
 }
 function usePurePersona({route,message,context}) {
   if(route!=="persona_question" || looksLikePersonalUpdate(message) || looksLikeExternalTask(message) || hasConcreteBuyerTask({message,context}) || requiresStructuredBuyerUnderstanding({message,route})) return false;

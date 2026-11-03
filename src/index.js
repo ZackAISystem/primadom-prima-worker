@@ -3032,7 +3032,7 @@ export default {
             const semanticFacts=(personaA1.interpretation.memory_candidates||[])
               .filter(item=>item?.key && item?.value && Number(item.confidence)>=0.8 &&
                 (item.key !== "name" && item.key !== "user_name" ||
-                 isEvidenceBackedUserName(message, item.value)))
+                 isEvidenceBackedUserName(message, item.value, {semanticVerified:true})))
               .map(item=>({fact_key:item.key === "name" ? "user_name" : item.key,
                 fact_value:normalizeMemoryFactValue(item.key === "name" ? "user_name" : item.key,item.value),
                 confidence:Number(item.confidence),source:"persona_semantic_a1"}));
@@ -3189,7 +3189,7 @@ export default {
                           item?.confidence
                         ) >= 0.8 &&
                         (item?.key !== "name" && item?.key !== "user_name" ||
-                         isEvidenceBackedUserName(message, item.value))
+                         isEvidenceBackedUserName(message, item.value, {semanticVerified:true}))
                     )
                     .map(
                       item => ({

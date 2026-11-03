@@ -286,7 +286,8 @@ function stripIntroGreeting(message = "") {
 // must be interpreted semantically before persistence, not promoted by regex.
 // This function validates candidates only: it does NOT manufacture a name.
 export function isEvidenceBackedUserName(message = "", candidate = "", {
-  expectingName = false
+  expectingName = false,
+  semanticVerified = false
 } = {}) {
   const name = cleanTextValue(candidate, 40);
   if (!name || !/^[A-Za-z][A-Za-z' -]{0,39}$/.test(name) ||
@@ -307,15 +308,19 @@ export function isEvidenceBackedUserName(message = "", candidate = "", {
   const call = new RegExp(
     `\\bcall\\s+me\\s+(${safe})(?=$|[,.!?;:—-]|\\s+(?:and|but|from|instead)\\b)`, "i"
   ).exec(raw);
-  if (call && /^[A-Z]/.test(call[1])) return true;
+  // "Call me ..." may request a phone call rather than a preferred name.
+  // Require semantic interpretation before trusting this ambiguous grammar.
+  if (call && semanticVerified && /^[A-Z]/.test(call[1])) return true;
 
   // "I'm Zack" / "I'm Zack, looking ..." can be local only when the
   // ORIGINAL proper-name token is capitalized and the grammar closes.
   // "I'm an investor" / "I'm worried about ROI" stay non-name facts.
   const intro = new RegExp(
-    `^I(?:['’]?m|\\s+am)\\s+(${safe})(?=$|[,.!?;:—-]|\\s+(?:and\\s+(?:looking|searching|seeking|wanting|needing|planning)\\b|looking\\b|searching\\b|seeking\\b|wanting\\b|needing\\b|interested\\s+in\\b))`, "i"
+    `^I(?:['’]?m|\\s+am)\\s+(${safe})(?=$|[,.!?;:—-]|\\s+(?:and\\s+(?:i(?:['’]?m|\\s+am)\\s+)?(?:looking|searching|seeking|wanting|needing|planning)\\b|looking\\b|searching\\b|seeking\\b|wanting\\b|needing\\b|interested\\s+in\\b))`, "i"
   ).exec(raw);
-  if (intro && /^[A-Z]/.test(intro[1]) &&
+  // "I'm ..." can describe a state, role or goal. Capitalization alone
+  // is not enough to persist a client name.
+  if (intro && semanticVerified && /^[A-Z]/.test(intro[1]) &&
       intro[1].split(/\s+/).every(part => /^[A-Z]/.test(part))) return true;
 
   // An explicit conversational introduction is distinct from a statement
@@ -440,16 +445,13 @@ export function extractMemoryFacts(
     /\bmy name is\s+([A-Za-z][A-Za-z' -]{0,40})/i
   );
 
-  if (!match) {
-    match = text.match(
-      /\b(?:you can\s+|you may\s+)?call me\s+(?!back\b|later\b|tomorrow\b|today\b|at\b|on\b|for\b|about\b)([A-Za-z][A-Za-z' -]{0,40})/i
-    );
-  }
+  // "Call me ..." is ambiguous between contact scheduling and a preferred
+  // name. Preserve the utterance for the existing semantic interpretation.
 
   if (match) {
     const parsedName = match[1]
       .replace(/[,;.!?][\s\S]*$/u, "")
-      .replace(/\s+and\s+(?=(?:my\s+(?:phone|whats\s*app|whatsapp|email|number)\b|i(?:['’]?m|\s+am)\b|we(?:['’]?re|\s+are)\b))[\s\S]*$/i, "")
+      .replace(/\s+and\s+(?=(?:my\s+(?:phone|whats\s*app|whatsapp|email|number)\b|i\b|we(?:['’]?re|\s+are)\b))[\s\S]*$/i, "")
       .replace(/\s+(?:for (?:this|the) (?:conversation|chat)|instead of\b|from now on\b|and (?:find|search|show|compare|recommend|book|contact)\b)[\s\S]*$/i, "")
       .trim();
     // Fail closed rather than persist an action or sentence as a name.
