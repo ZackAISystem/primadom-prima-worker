@@ -281,6 +281,62 @@ function stripIntroGreeting(message = "") {
   ).trim();
 }
 
+// A-01: Memory integrity gate. A confidence score is not evidence of a name.
+// Use the user's verbatim self-introduction; ambiguous identity/profile text
+// must be interpreted semantically before persistence, not promoted by regex.
+// This function validates candidates only: it does NOT manufacture a name.
+export function isEvidenceBackedUserName(message = "", candidate = "", {
+  expectingName = false
+} = {}) {
+  const name = cleanTextValue(candidate, 40);
+  if (!name || !/^[A-Za-z][A-Za-z' -]{0,39}$/.test(name) ||
+      name.split(/\s+/).length > 3) return false;
+  // Coordinators / personal pronouns inside a candidate indicate an
+  // incorrectly swallowed sentence, not an independently supplied name.
+  if (/\b(?:and|but|because|i|we|you|my|your)\b/i.test(name)) return false;
+  const raw = stripIntroGreeting(message);
+  const safe = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const explicit = new RegExp(
+    `\\bmy\\s+name\\s+is\\s+${safe}(?=$|[,.!?;:—-]|\\s+(?:and|but|from)\\b)`, "i"
+  );
+  if (explicit.test(raw)) return true;
+
+  // "Call me" is ambiguous with a request for a phone call. Without a
+  // proper-name-shaped literal in the original text, require semantic
+  // clarification; never save "Next Week" as a name.
+  const call = new RegExp(
+    `\\bcall\\s+me\\s+(${safe})(?=$|[,.!?;:—-]|\\s+(?:and|but|from|instead)\\b)`, "i"
+  ).exec(raw);
+  if (call && /^[A-Z]/.test(call[1])) return true;
+
+  // "I'm Zack" / "I'm Zack, looking ..." can be local only when the
+  // ORIGINAL proper-name token is capitalized and the grammar closes.
+  // "I'm an investor" / "I'm worried about ROI" stay non-name facts.
+  const intro = new RegExp(
+    `^I(?:['’]?m|\\s+am)\\s+(${safe})(?=$|[,.!?;:—-]|\\s+(?:and\\s+(?:looking|searching|seeking|wanting|needing|planning)\\b|looking\\b|searching\\b|seeking\\b|wanting\\b|needing\\b|interested\\s+in\\b))`, "i"
+  ).exec(raw);
+  if (intro && /^[A-Z]/.test(intro[1]) &&
+      intro[1].split(/\s+/).every(part => /^[A-Z]/.test(part))) return true;
+
+  // An explicit conversational introduction is distinct from a statement
+  // that a property "is" something; case plus exact name must match.
+  const thisIs = new RegExp(
+    `\\bthis\\s+is\\s+(${safe})(?=$|[,.!?;:—-])`, "i"
+  ).exec(raw);
+  if (thisIs && /^[A-Z]/.test(thisIs[1])) return true;
+
+  // Prima has just asked for a name. Never infer identity from a free-form
+  // reply unless the candidate is the entire reply or precedes a clear task.
+  if (expectingName) {
+    if (raw.toLowerCase() === name.toLowerCase()) return true;
+    const contextual = new RegExp(
+      `^(${safe})(?=\\s*[,;:—-]\\s*|\\s+(?:looking|searching|show|find|need|want)\\b)`, "i"
+    ).exec(raw);
+    if (contextual && /^[A-Z]/.test(contextual[1])) return true;
+  }
+  return false;
+}
+
 export function isExplicitNameOnlyMessage(
   message = ""
 ) {
@@ -393,7 +449,7 @@ export function extractMemoryFacts(
   if (match) {
     const parsedName = match[1]
       .replace(/[,;.!?][\s\S]*$/u, "")
-      .replace(/\s+and\s+(?=my\s+(?:phone|whats\s*app|whatsapp|email|number)\b)[\s\S]*$/i, "")
+      .replace(/\s+and\s+(?=(?:my\s+(?:phone|whats\s*app|whatsapp|email|number)\b|i(?:['’]?m|\s+am)\b|we(?:['’]?re|\s+are)\b))[\s\S]*$/i, "")
       .replace(/\s+(?:for (?:this|the) (?:conversation|chat)|instead of\b|from now on\b|and (?:find|search|show|compare|recommend|book|contact)\b)[\s\S]*$/i, "")
       .trim();
     // Fail closed rather than persist an action or sentence as a name.
@@ -480,6 +536,7 @@ export function extractMemoryFacts(
   if (
     match &&
     looksLikeBareName(match[1]) &&
+    isEvidenceBackedUserName(message, match[1], {expectingName}) &&
     !looksLikeQuestionOrRequest(match[1]) &&
       !/^(?:i|i['’]?m|im|my|we|we['’]?re|were)$/i.test(String(match[1]).trim()) &&
     !/^(?:looking|searching|show|find|need|want|interested|buying|seeking|after|planning|trying|hoping|waiting|thinking|wondering|here|just|ready|sorry|not)\b/i.test(match[1])
@@ -496,6 +553,7 @@ export function extractMemoryFacts(
     expectingName &&
     !looksLikeQuestionOrRequest(text) &&
     looksLikeBareName(text) &&
+    /^[A-Z]/.test(text) &&
     text.split(/\s+/).length <= 3
   ) {
     setFact(

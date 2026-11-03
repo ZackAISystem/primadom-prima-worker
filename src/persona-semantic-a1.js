@@ -111,7 +111,7 @@ function selectPersonaSections({message,context}) {
 }
 function looksLikePersonalUpdate(message) {
   const q=String(message || "");
-  return /\b(?:call me|address me as|my budget|our budget|i(?:'m| am) (?:looking for|interested in|planning to buy)|remember (?:my|that)|what did i (?:say|tell)|what(?:'s| is) my (?:name|budget)|my name is|i live in)\b/i.test(q);
+  return /\b(?:call me|address me as|my budget|our budget|i(?:'m| am) (?:looking for|interested in|planning to buy)|remember (?:my|that)|what did i (?:say|tell)|what(?:'s| is) my (?:name|budget)|my name is|i live in|this is [A-Z][a-z]+)\b/i.test(q);
 }
 function looksLikeExternalTask(message) {
   const q=String(message || "");
@@ -135,8 +135,18 @@ function hasConcreteBuyerTask({message,context}) {
   const activeEntity=Boolean(current?.slug && ["project","developer","district"].includes(current?.type));
   return activeEntity && /\b(?:this (?:project|property|development|unit|apartment)|that (?:project|property|unit)|these (?:options|units|offers)|those (?:options|units|offers))\b/i.test(q);
 }
+// A-02/A-03: a domain/task ambiguity is NOT proof of a Persona-only
+// question. Route it to the existing full RequestInterpreter schema with
+// real search constraints; do not add a new model call or response catalog.
+export function requiresStructuredBuyerUnderstanding({message,route}) {
+  if (!["persona_question", "unsupported"].includes(route)) return false;
+  const q = String(message || "");
+  const buyerSubject = /\b(?:properties|property|projects?|apartments?|villas?|townhouses?|penthouses?|bedrooms?|\d\s*br|off[ -]?plan|invest(?:ment|ing|or)?|roi|rental|yield|buy|purchase|budget|aed|million|districts?|areas?|communities|dubai\s+(?:hills|marina|creek|land)|jvc|jlt|palm\s+jumeirah)\b/i.test(q);
+  const taskSignal = /\b(?:find|show|select|search|list|compare|recommend|options|opportunities|looking|need|want|interested|thinking|considering|tell\s+me\s+about|help\s+me|can\s+you\s+(?:tell|help))\b/i.test(q);
+  return buyerSubject && taskSignal;
+}
 function usePurePersona({route,message,context}) {
-  if(route!=="persona_question" || looksLikePersonalUpdate(message) || looksLikeExternalTask(message) || hasConcreteBuyerTask({message,context})) return false;
+  if(route!=="persona_question" || looksLikePersonalUpdate(message) || looksLikeExternalTask(message) || hasConcreteBuyerTask({message,context}) || requiresStructuredBuyerUnderstanding({message,route})) return false;
   const q=String(message || "");
   const subject=/(?:\bprima\b|\bprimadom\b|\bthredeesh\b|\bfounder\b|\bcreator\b|\bemaar\b|\b(?:you|your|yourself)\b|\b(?:platform|company|agency|principles|values|mission|capabilities)\b)/i.test(q);
   const referent=recentPersonaContext(context);

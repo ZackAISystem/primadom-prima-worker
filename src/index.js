@@ -17,7 +17,7 @@ import {
   detectStructuredFactKeysV1
 } from "./fast-gate.js";
 import { interpretRequest } from "./request-interpreter.js";
-import { eligible as personaA1Eligible, generate as personaA1Generate } from "./persona-semantic-a1.js";
+import { eligible as personaA1Eligible, generate as personaA1Generate, requiresStructuredBuyerUnderstanding } from "./persona-semantic-a1.js";
 import {
   resolveNamedEntity,
   buildKnowledgeContext
@@ -28,6 +28,7 @@ import {
 } from "./compare.js";
 import {
   extractMemoryFacts,
+  isEvidenceBackedUserName,
   isContextualNameCandidate,
   isNonNameOnboardingReply,
   isExplicitNameOnlyMessage,
@@ -1897,6 +1898,12 @@ export default {
               contextEnvelope
           });
 
+        // Block A: mixed buyer intent is not a zero-token Persona turn.
+        // This guard selects an EXISTING semantic route; it does not answer.
+        const blockAEarlyMixedIntent =
+          requiresStructuredBuyerUnderstanding({message, route}) &&
+          !h29Direct.direct_request;
+
         let interpreterResult =
           null;
 
@@ -1931,6 +1938,7 @@ export default {
           });
 
         const baseFastPath =
+          !blockAEarlyMixedIntent &&
           !contextualNameCandidate &&
             !explicitNameOnlyMessage &&
             !onboardingAwaitingName &&
@@ -2395,6 +2403,21 @@ export default {
               contextEnvelope,
             conversationMove
           });
+
+        // A-02/A-03: when a Persona-looking first request also asks for
+        // actual buyer work, use the existing typed RequestInterpreter ONCE.
+        // Pure Persona must not consume Search intent. Search V3 is untouched.
+        const blockAMixedFirstTurn =
+          turn?.phase === "initial" &&
+          blockAEarlyMixedIntent;
+        if (blockAMixedFirstTurn) {
+          fastGate = {
+            ...fastGate,
+            decision: "interpret",
+            use_interpreter: true,
+            reason: "block_a_mixed_buyer_understanding"
+          };
+        }
 
         // E23: an isolated reference-only request with no conversational
         // referent, no search results and no verified identity history cannot
@@ -2983,6 +3006,7 @@ export default {
         if (
           env?.PRIMA_PERSONA_GENERATIVE_A1 === "1" &&
           personaA1Eligible({route,turn,message}) &&
+          !blockAMixedFirstTurn &&
           !i32ExpectedContactOnly &&
           !(route === "unsupported" && classifyClearlyOffTopicRequest(message)) &&
           !deterministicEntityReady && !preInterpreterCompareDecision
@@ -3006,7 +3030,9 @@ export default {
               contextEnvelope.request_interpretation = personaA1.interpretation;
             }
             const semanticFacts=(personaA1.interpretation.memory_candidates||[])
-              .filter(item=>item?.key && item?.value && Number(item.confidence)>=0.8)
+              .filter(item=>item?.key && item?.value && Number(item.confidence)>=0.8 &&
+                (item.key !== "name" && item.key !== "user_name" ||
+                 isEvidenceBackedUserName(message, item.value)))
               .map(item=>({fact_key:item.key === "name" ? "user_name" : item.key,
                 fact_value:normalizeMemoryFactValue(item.key === "name" ? "user_name" : item.key,item.value),
                 confidence:Number(item.confidence),source:"persona_semantic_a1"}));
@@ -3161,7 +3187,9 @@ export default {
                         item?.value &&
                         Number(
                           item?.confidence
-                        ) >= 0.8
+                        ) >= 0.8 &&
+                        (item?.key !== "name" && item?.key !== "user_name" ||
+                         isEvidenceBackedUserName(message, item.value))
                     )
                     .map(
                       item => ({
