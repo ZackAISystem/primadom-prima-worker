@@ -89,6 +89,8 @@ import {
 import {
   buildSearchRouteResponse
 } from "./search-response.js";
+import { normalizeSearchContextV1 } from "./search-context.js";
+import { prepareFastProjectPaginationV1 } from "./pagination-fastpath-v1.js";
 import {
   resolveProjectCardFacts,
   projectCardFactsFromSearchKnowledge,
@@ -1785,6 +1787,73 @@ export default {
       // Validate before any Memory, messages or conversation state is read.
       if (!(await verifyConversationAccess(request, env, conversationId))) {
         return json({ok:false, error:"conversation_access_denied"}, 403);
+      }
+
+      // P24: an explicitly requested, already fetched project batch is not
+      // a new natural-language task. Preserve conversation access, ordering
+      // and both messages; bypass only unnecessary semantic/knowledge reads.
+      const paginationFast = body?.pagination_fastpath_v1 === true
+        ? prepareFastProjectPaginationV1({
+            message,
+            context: normalizeSearchContextV1(body?.search_context),
+            original: body?.search_context,
+            turn
+          })
+        : null;
+      if (paginationFast) {
+        const startedAt = Date.now();
+        const ordering = buildConversationOrderingV1({conversationId, turn});
+        // Require monotonic turn ordering: no optimistic reply on an
+        // untracked or stale turn.
+        if (ordering.guarded) {
+          const updated = await supabaseUpdateReturning(
+            env, "conversations", ordering.query,
+            {...buildConversationPatch(body, "property_search"), ...ordering.patch}
+          );
+          if (updated.length === 0) {
+            return json({ok:false,error:"pagination_stale_turn"},409);
+          }
+        } else {
+          return json({ok:false,error:"pagination_turn_required"},400);
+        }
+        const common = {
+          conversation_id: conversationId,
+          turn_id: turn.turn_id,
+          turn_seq: turn.turn_seq,
+          turn_phase: turn.phase,
+          page_id: body?.page?.page_id || null,
+          page_type: body?.page?.page_type || null,
+          primary_entity_type: body?.entity?.primary_type || null,
+          primary_entity_slug: body?.entity?.primary_slug || null,
+          secondary_entity_type: body?.entity?.secondary_type || null,
+          secondary_entity_slug: body?.entity?.secondary_slug || null
+        };
+        await supabaseInsertIdempotentMessage(env,"messages",{
+          ...common,role:"user",content:message,route:"property_search",
+          metadata:{contract:"ContextEnvelopeV1",kind:"verified_pagination_fastpath"}
+        },"message_id");
+        const response = buildResponse({
+          conversationId,route:"property_search",answer:paginationFast.answer
+        });
+        response.response_type = "search_results";
+        response.cards = paginationFast.cards;
+        response.search_pagination = paginationFast.pagination;
+        response.turn = {...turn,phase:"tool_continuation"};
+        response.meta = {
+          ...response.meta,used_database:true,used_search:true,
+          used_openai:false,used_interpreter:false,used_final_openai:false,
+          total_openai_tokens:0,openai_calls_attempted:0,
+          next_action:"SEARCH",next_action_reason:"verified_pagination_fastpath",
+          worker_total_ms:Date.now()-startedAt
+        };
+        await supabaseInsertIdempotentMessage(env,"messages",{
+          ...common,role:"assistant",content:response.answer,
+          route:"property_search",response_type:"search_results",
+          used_openai:false,used_database:true,used_search:true,
+          metadata:{contract:"ResponseContractV1",kind:"verified_pagination_fastpath",
+            used_openai:false,restore_project_cards_v2:primaRestoreProjectCardsV2(response.cards)}
+        },"message_id");
+        return json(response);
       }
 
       try {
