@@ -1,4 +1,5 @@
 import { normalizePreferredLocationTextV1 } from "./preferred-location-v1.js";
+import { classifySearchTurnV1, contextualSearchQueryV1 } from "./search-turn-understanding.js";
 function humanizeSlug(
   value = ""
 ) {
@@ -583,11 +584,11 @@ export function buildPrimaSearchRequest({
     return null;
   }
 
-  if (
-    completedSearchContext(
-      context
-    )
-  ) {
+  // A carried prior SearchContext is conversational evidence, not proof
+  // that a NEW refinement has already run. Only the tool continuation
+  // completes the current search request.
+  if (completedSearchContext(context) &&
+      context?.turn?.phase === "tool_continuation") {
     return null;
   }
 
@@ -623,8 +624,15 @@ export function buildPrimaSearchRequest({
   const personalized = recommendationSearch
     ? personalizedRecommendationV1({message, context})
     : null;
+  const searchTurnKind = classifySearchTurnV1({message,route,context});
+  const semanticallyGroundedQuery = contextualSearchQueryV1({message,context});
+  // Never turn "that area" into a UAE-wide search because semantic
+  // context is absent, or silently drop preserved filters on a refinement.
+  if (["refinement", "contextual_search"].includes(searchTurnKind) &&
+      !semanticallyGroundedQuery) return null;
   const query =
     personalized?.query ||
+    semanticallyGroundedQuery ||
     exactMaxRefinement ||
     (continuingPreviousSearch
       ? augmentSearchQueryWithMemory({query: contextualQuery, context})
