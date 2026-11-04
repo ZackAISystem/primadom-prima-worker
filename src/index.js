@@ -17,7 +17,7 @@ import {
   detectStructuredFactKeysV1
 } from "./fast-gate.js";
 import { interpretRequest } from "./request-interpreter.js";
-import { eligible as personaA1Eligible, generate as personaA1Generate, requiresStructuredBuyerUnderstanding } from "./persona-semantic-a1.js";
+import { eligible as personaA1Eligible, generate as personaA1Generate, requiresStructuredBuyerUnderstanding, isComplexFirstTurnDialogue } from "./persona-semantic-a1.js";
 import {
   resolveNamedEntity,
   buildKnowledgeContext
@@ -2999,25 +2999,36 @@ export default {
         const deterministicRouteBeforeInterpreter =
           route;
 
+        // Block A: one Luna interpretation + answer for natural, open-ended
+        // first-turn introductions; direct Search/Contact keeps its own route.
+        const blockAComplexDialogue = isComplexFirstTurnDialogue({message,turn}) &&
+          !h29Direct.direct_request && !i32ExpectedContactOnly;
+
         // A1: single semantic call for candidate Persona/unsupported messages.
         // Successful semantic routing never re-enters RequestInterpreter.
         // Fallback to the legacy Interpreter happens ONLY after a model error.
         let personaA1 = null;
         if (
           env?.PRIMA_PERSONA_GENERATIVE_A1 === "1" &&
-          personaA1Eligible({route,turn,message}) &&
-          !blockAMixedFirstTurn &&
+          (blockAComplexDialogue || personaA1Eligible({route,turn,message})) &&
+          (!blockAMixedFirstTurn || blockAComplexDialogue) &&
           !i32ExpectedContactOnly &&
           !(route === "unsupported" && classifyClearlyOffTopicRequest(message)) &&
-          !deterministicEntityReady && !preInterpreterCompareDecision
+          (!deterministicEntityReady || blockAComplexDialogue) && !preInterpreterCompareDecision
         ) {
           a1StartedAt = Date.now();
           personaA1 = await personaA1Generate({
-            env,message,context:contextEnvelope,memory:activeMemory,route
+            env,message,context:contextEnvelope,memory:activeMemory,route,
+            dialogueMode:blockAComplexDialogue
           });
           a1FinishedAt = Date.now();
           if (personaA1?.decision === "answer") {
             route = "persona_question";
+          } else if (personaA1?.decision === "delegate" && blockAComplexDialogue) {
+            // Rare tool-needed first turn: delegate to the original typed
+            // Interpreter, retaining all search filters (no A1 null constraints).
+            fastGate = {...fastGate, decision:"interpret",use_interpreter:true,
+              reason:"block_a_dialogue_tool_delegation"};
           } else if (personaA1?.decision === "route") {
             interpreterResult = {
               interpretation:personaA1.interpretation,
@@ -3029,28 +3040,36 @@ export default {
             if (contextEnvelope) {
               contextEnvelope.request_interpretation = personaA1.interpretation;
             }
-            const semanticFacts=(personaA1.interpretation.memory_candidates||[])
-              .filter(item=>item?.key && item?.value && Number(item.confidence)>=0.8 &&
-                (item.key !== "name" && item.key !== "user_name" ||
-                 isEvidenceBackedUserName(message, item.value, {semanticVerified:true})))
-              .map(item=>({fact_key:item.key === "name" ? "user_name" : item.key,
-                fact_value:normalizeMemoryFactValue(item.key === "name" ? "user_name" : item.key,item.value),
-                confidence:Number(item.confidence),source:"persona_semantic_a1"}));
-            if (semanticFacts.length) {
-              extractedFacts=[...extractedFacts,...semanticFacts];
-              activeMemory=mergeCurrentTurnMemory(activeMemory,semanticFacts);
-              contextEnvelope.memory ??= {active_facts:[]};
-              contextEnvelope.memory.active_facts=activeMemory;
-              refreshConversationStateV1(contextEnvelope);
-            }
           }
+        }
+
+        // Persist model-recognized, source-evidenced identity even when A1
+        // answered the educational question directly. Never store an inferred
+        // name just because the model assigned it a confidence score.
+        const a1MemoryCandidates = personaA1?.decision === "route"
+          ? personaA1.interpretation?.memory_candidates
+          : personaA1?.memory_candidates;
+        const a1MemoryFacts=(Array.isArray(a1MemoryCandidates) ? a1MemoryCandidates : [])
+          .filter(item=>item?.key && item?.value && Number(item.confidence)>=0.8 &&
+            ((item.key !== "name" && item.key !== "user_name") ||
+              isEvidenceBackedUserName(message,item.value,{semanticVerified:true})))
+          .map(item=>({fact_key:item.key === "name" ? "user_name" : item.key,
+            fact_value:normalizeMemoryFactValue(item.key === "name" ? "user_name" : item.key,item.value),
+            confidence:Number(item.confidence),source:"persona_semantic_a1"}));
+        if(a1MemoryFacts.length) {
+          extractedFacts=[...extractedFacts,...a1MemoryFacts];
+          activeMemory=mergeCurrentTurnMemory(activeMemory,a1MemoryFacts);
+          contextEnvelope.memory ??= {active_facts:[]};
+          contextEnvelope.memory.active_facts=activeMemory;
+          refreshConversationStateV1(contextEnvelope);
         }
 
         if (
           fastGate.use_interpreter &&
           !["answer","route"].includes(personaA1?.decision) &&
           // A failed but already attempted A1 request must not trigger a second paid interpreter.
-          !personaA1?.used &&
+          (!personaA1?.used ||
+            (blockAComplexDialogue && personaA1?.decision === "delegate")) &&
           !(route === "unsupported" && classifyClearlyOffTopicRequest(message)) &&
           !deterministicEntityReady &&
           !preInterpreterCompareDecision &&

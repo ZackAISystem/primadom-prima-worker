@@ -220,6 +220,44 @@ const redact = x => cut(x,210)
   .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,"[email]")
   .replace(/\+?\d[\d\s().-]{7,}\d/g,"[phone]");
 
+// Block A final: recognize a *class* of open-ended first-turn conversations,
+// not an inventory of test phrases, names, or prepared answers. The model
+// decides whether educational advice is possible or a tool is required.
+// Explicit transactional search, contact and property filters retain their
+// existing typed Interpreter/Search/Funnel path.
+export function isComplexFirstTurnDialogue({message,turn} = {}) {
+  const q=String(message || "").trim();
+  if (turn?.phase !== "initial" || q.length < 95 || q.length > 2400 ||
+      (Number.isFinite(turn?.turn_seq) && turn.turn_seq > 1)) return false;
+  const firstPerson=/\b(?:i(?:['’]m|\s+am|['’]ve|\s+have|['’]d|\s+would|\s+want|\s+need)|my name is|this is [A-Z][a-z]+|we(?:['’]re|\s+are|['’]ve))\b/i.test(q);
+  const advisory=/\b(?:understand|learning|learn|guide|explain|how|why|what should|what do i|risks?|benefits?|advantages?|process|fees|decision|beginner|first.time|getting started|where to start|suitable|not sure|questions about)\b/i.test(q);
+  const invitesAnswer=/\?|\b(?:i(?:['’]d|\s+would) love to|could you|can you|please help|i need some guidance|questions? about|so many questions|have questions)\b/i.test(q);
+  const transactional=/\b(?:find(?: me)?|show(?: me)?|search(?: for)?|list(?: me)?|shortlist|compare|recommend|suggest|check availability|book|schedule|arrange a viewing|contact(?: me)?|call me back|whatsapp me)\b/i.test(q);
+  const concreteFilters=/\b(?:AED\s*[\d,.]+|\d+\s*(?:bedrooms?|br)\b|under\s+(?:AED\s*)?\d|below\s+(?:AED\s*)?\d|up to\s+(?:AED\s*)?\d)\b/i.test(q);
+  return firstPerson && advisory && invitesAnswer && !transactional && !concreteFilters;
+}
+
+// One response from the existing Persona A1 model can BOTH answer an open-ended
+// buyer question and identify a stated name. Identity is evidence-checked again
+// in index.js before any write to canonical Memory.
+const DIALOGUE_FORMAT={type:"json_schema",name:"prima_first_turn_dialogue_v1",strict:true,
+  schema:{type:"object",additionalProperties:false,
+    properties:{disposition:{type:"string",enum:["answer","delegate"]},
+      answer:{type:"string"},name:{type:["string","null"]},
+      name_confidence:{type:"number"}},
+    required:["disposition","answer","name","name_confidence"]}};
+
+function dialogueInstructions() {
+  return [
+    "You are Prima, the AI UAE property adviser within Primadom.ai. Read the WHOLE first user message as a human would: a self-introduction, circumstances, an actual question, and possibly an explicit name. Be warm, clear, grounded and genuinely useful.",
+    "For general UAE property education, first-time buyer guidance, off-plan pros/cons, risks, fees or investing fundamentals: disposition=answer. Give a substantive tailored answer (usually 3-6 sentences), directly address what was asked and offer one relevant next step. Generic education DOES NOT require live market data or entity lookup. Never give a canned 'market data unavailable' disclaimer as the whole answer.",
+    "For a specific lookup of actual units/projects, current prices, availability, named-entity facts, personalized ranked shortlists, booking, lead/contact or a tool-dependent decision: disposition=delegate and answer=''. Do not invent tool results or claim you executed a search. The existing Search/Funnel/Knowledge layers will handle this request.",
+    "Return the user's own name ONLY when explicitly and unambiguously introduced, regardless of where it appears. A profession, emotion, place, timeframe and property name are NOT a person's name. Otherwise name=null and name_confidence=0. Do not reinterpret 'call me' as consent to contact a person.",
+    "Use general established knowledge and the verified Primadom identity/context below. Never invent project offers, live prices, exact taxes/fees, ROI, founder biography, or claim to have retrieved live records. Do not invent market measurements. Do not recommend contacting an agent unless user asks.",
+    "VERIFIED PRIMADOM FACTS: " + CORE_FACTS + "\nPlatform purpose: " + contract.purpose.canonical + "\nKnowledge approach: " + KNOWLEDGE_NETWORK.client_value_v1,
+  ].join("\n");
+}
+
 export function eligible({route,turn,message}) {
   return ["persona_question","unsupported"].includes(route) &&
     turn?.phase !== "tool_continuation" &&
@@ -315,23 +353,23 @@ function interpretationForRoute(p) {
     overall_confidence:p.confidence
   };
 }
-export async function generate({env,message,context,memory,route,fetchFn=fetch}) {
+export async function generate({env,message,context,memory,route,dialogueMode=false,fetchFn=fetch}) {
   if (!env?.OPENAI_API_KEY) return {decision:"error",used:false,usage_unknown:true};
   const started=Date.now();
   const controller=new AbortController();
   const timeout=setTimeout(()=>controller.abort(),15000);
   let usage=null;
   try {
-    const purePersona=usePurePersona({route,message,context});
+    const purePersona=!dialogueMode && usePurePersona({route,message,context});
     const response=await fetchFn("https://api.openai.com/v1/responses",{
       method:"POST", signal:controller.signal,
       headers:{Authorization:`Bearer ${env.OPENAI_API_KEY}`,"Content-Type":"application/json"},
       body:JSON.stringify({
         model:env.PRIMA_PERSONA_MODEL || "gpt-6-luna",store:false,
         reasoning:{effort:"none"},
-        instructions:purePersona ? buildPurePersonaInstructions({message,context}) : buildInstructions({message,context}),
-        text:{format:purePersona ? PURE_FORMAT : FORMAT},
-        max_output_tokens:purePersona ? 220 : 640,
+        instructions:dialogueMode ? dialogueInstructions() : purePersona ? buildPurePersonaInstructions({message,context}) : buildInstructions({message,context}),
+        text:{format:dialogueMode ? DIALOGUE_FORMAT : purePersona ? PURE_FORMAT : FORMAT},
+        max_output_tokens:dialogueMode ? 480 : purePersona ? 220 : 640,
         input:compactInput({message,context,memory,route,purePersona})
       })
     });
@@ -339,6 +377,24 @@ export async function generate({env,message,context,memory,route,fetchFn=fetch})
     usage=data?.usage ?? null;
     if(!response.ok) throw Error(`OpenAI HTTP ${response.status}`);
     const p=JSON.parse(outputText(data));
+    if(dialogueMode) {
+      if(!["answer","delegate"].includes(p?.disposition) ||
+         typeof p?.answer!=="string" || p.answer.length>1800 ||
+         !Number.isFinite(p?.name_confidence) || p.name_confidence<0 ||
+         p.name_confidence>1 ||
+         (p.name!==null && (typeof p.name!=="string" || p.name.length>60)) ||
+         /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(p.answer) ||
+         (p.disposition==="answer" && !p.answer.trim()) ||
+         (p.disposition==="delegate" && p.answer.trim()))
+        throw Error("invalid_semantic_output");
+      const memory_candidates = p.name && p.name_confidence>=0.85
+        ? [{key:"name",value:p.name.trim(),confidence:p.name_confidence}]
+        : [];
+      return {decision:p.disposition==="answer" ? "answer" : "delegate",
+        answer:p.disposition==="answer" ? p.answer.trim() : null,
+        memory_candidates,used:true,usage,
+        latency_ms:Date.now()-started,usage_unknown:!usage};
+    }
     if(purePersona) {
       if(typeof p?.answer!=="string" || !p.answer.trim() || p.answer.length>1500 ||
         /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(p.answer)) throw Error("unsafe_persona_answer");

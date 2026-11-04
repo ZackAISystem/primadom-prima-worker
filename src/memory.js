@@ -316,7 +316,7 @@ export function isEvidenceBackedUserName(message = "", candidate = "", {
   // ORIGINAL proper-name token is capitalized and the grammar closes.
   // "I'm an investor" / "I'm worried about ROI" stay non-name facts.
   const intro = new RegExp(
-    `^I(?:['’]?m|\\s+am)\\s+(${safe})(?=$|[,.!?;:—-]|\\s+(?:and\\s+(?:i(?:['’]?m|\\s+am)\\s+)?(?:looking|searching|seeking|wanting|needing|planning)\\b|looking\\b|searching\\b|seeking\\b|wanting\\b|needing\\b|interested\\s+in\\b))`, "i"
+    `(?:^|[.!?]\\s+|[,;]\\s+)I(?:['’]?m|\\s+am)\\s+(${safe})(?=$|[,.!?;:—-]|\\s+(?:and\\s+(?:i(?:['’]?m|\\s+am)\\s+)?(?:looking|searching|seeking|wanting|needing|planning)\\b|looking\\b|searching\\b|seeking\\b|wanting\\b|needing\\b|interested\\s+in\\b|by\\s+the\\s+way\\b))`, "i"
   ).exec(raw);
   // "I'm ..." can describe a state, role or goal. Capitalization alone
   // is not enough to persist a client name.
