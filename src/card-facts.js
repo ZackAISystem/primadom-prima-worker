@@ -340,8 +340,9 @@ export async function resolveProjectCardFacts(
     We request only verified key_facts for the
     maximum three cards shown in Prima Dialog.
   */
-  const raw =
-    await supabaseRpc(
+  let raw;
+  try {
+    raw = await supabaseRpc(
       env,
       "resolve_search_project_knowledge_v1",
       {
@@ -356,6 +357,16 @@ export async function resolveProjectCardFacts(
         ]
       }
     );
+  } catch (error) {
+    // The search result already contains verified project identities.
+    // Optional card-fact enrichment must not turn valid Search results
+    // into HTTP 500 when its Supabase RPC times out or is unavailable.
+    console.warn(
+      "d3_optional_card_facts_unavailable",
+      String(error?.message || error).slice(0, 240)
+    );
+    return null;
+  }
 
   return normalizeProjectCardFactsResult(
     raw,
