@@ -15,7 +15,7 @@ function queryTarget(query) {
     // D4 only: remove a trailing request for the developer profile,
     // without changing the verified developer name being looked up.
     .replace(
-      /\s+(?:and\s+)?(?:show|give)\s+(?:me\s+)?(?:its|their|the)\s+(?:profile|overview|details)\s*[.!?]*$/i,
+      /\s+(?:and\s+)?(?:show|give)\s+(?:me\s+)?(?:its|their|the)\s+(?:developer\s+)?(?:profile|overview|details)\s*[.!?]*$/i,
       ""
     );
 
