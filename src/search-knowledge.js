@@ -252,21 +252,33 @@ export async function resolveSearchCandidateKnowledge(
     return null;
   }
 
-  const raw =
-    await supabaseRpc(
+  let raw;
+  try {
+    raw = await supabaseRpc(
       env,
       "resolve_search_project_knowledge_v1",
       {
         p_project_slugs:
           slugs,
-
-        p_language_code:
-          "en",
-
-        p_families:
-          KNOWLEDGE_FAMILIES
+        p_language_code: "en",
+        p_families: KNOWLEDGE_FAMILIES
       }
     );
+  } catch (error) {
+    const detail = String(error?.message || error);
+    // This is optional enrichment: a timed-out knowledge lookup must
+    // not break verified project search results or their pagination.
+    // Preserve all other errors for diagnosis rather than hiding them.
+    if (!detail.startsWith("supabase_rpc_failed:500:") ||
+        !detail.includes('"code":"57014"')) {
+      throw error;
+    }
+    console.warn("recommendation_knowledge_rpc_timeout", {
+      rpc: "resolve_search_project_knowledge_v1",
+      candidate_count: slugs.length
+    });
+    return null;
+  }
 
   return normalizeSearchKnowledgeResult(
     raw,
