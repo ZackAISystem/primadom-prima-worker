@@ -17,11 +17,6 @@ import {
   detectStructuredFactKeysV1
 } from "./fast-gate.js";
 import { interpretRequest } from "./request-interpreter.js";
-import {
-  classifySearchTurnV1,
-  resolveOrdinalSearchPairV1,
-  buildSearchRecallV1
-} from "./search-turn-understanding.js";
 import { eligible as personaA1Eligible, generate as personaA1Generate, requiresStructuredBuyerUnderstanding, isComplexFirstTurnDialogue } from "./persona-semantic-a1.js";
 import {
   resolveNamedEntity,
@@ -1942,11 +1937,7 @@ export default {
             fastGate
           });
 
-        const earlySearchTurn = classifySearchTurnV1({
-          message, route, context: contextEnvelope
-        });
         const baseFastPath =
-          !earlySearchTurn &&
           !blockAEarlyMixedIntent &&
           !contextualNameCandidate &&
             !explicitNameOnlyMessage &&
@@ -2315,21 +2306,6 @@ export default {
         const e21ReferenceOnly = e21ReferenceCandidate && e21FactKeys.length === 0 &&
           /^(?:and\s+)?(?:what\s+about\s+)?(?:the\s+)?(?:previous|earlier|other)\s+(?:project|one)\s*[?.!]*$/i.test(message.trim());
 
-        // Search Continuity: current user intent wins over an old compare
-        // clarification. The model understands contextual refinements; it
-        // never reads the catalog or runs pagination.
-        const searchTurnKind = classifySearchTurnV1({
-          message, route, context: contextEnvelope
-        });
-        if (["refinement", "contextual_search"].includes(searchTurnKind)) {
-          route = "property_search";
-        } else if (searchTurnKind === "recall") {
-          route = "follow_up";
-        } else if (searchTurnKind === "entity_knowledge") {
-          route = "page_question";
-        }
-        const searchRecallReference = searchTurnKind === "recall"
-          ? buildSearchRecallV1({message,context:contextEnvelope}) : null;
         const originalTopicRoute = route;
         const explicitReturnTaskRoute = explicitNewTaskAfterReturnV1(message, contextEnvelope);
         let conversationMove =
@@ -2441,15 +2417,6 @@ export default {
             use_interpreter: true,
             reason: "block_a_mixed_buyer_understanding"
           };
-        }
-        if (["refinement", "contextual_search", "entity_knowledge"]
-            .includes(searchTurnKind) && turn?.phase === "initial") {
-          fastGate = {...fastGate,decision:"interpret",use_interpreter:true,
-            reason:"search_context_semantic_understanding_v1"};
-        }
-        if (searchTurnKind === "recall") {
-          fastGate = {...fastGate,decision:"execute",use_interpreter:false,
-            reason:"verified_search_context_recall_v1"};
         }
 
         // E23: an isolated reference-only request with no conversational
@@ -2611,18 +2578,11 @@ export default {
               }
             : null;
 
-        // Two ordinal references are resolved ONLY from the signed-in
-        // conversation's canonical, verified SearchContext batch.
-        const verifiedOrdinalPair = resolveOrdinalSearchPairV1({
-          message, route, context:contextEnvelope
-        });
-        if (verifiedOrdinalPair) {
-          contextEnvelope.working_entity = verifiedOrdinalPair.first;
-          contextEnvelope.working_comparison_target = verifiedOrdinalPair.second.name;
-        }
         const comparisonPair =
           route === "compare"
-            ? extractProjectComparisonPair(message)
+            ? extractProjectComparisonPair(
+                message
+              )
             : null;
 
         const comparisonPrimaryCandidate =
@@ -2900,10 +2860,6 @@ export default {
             : null;
 
         const deterministicEntityCandidate =
-          (verifiedOrdinalPair ? {
-            ...verifiedOrdinalPair.first,
-            role:"primary",source:"verified_search_pair"
-          } : null) ||
           e21ReferenceCandidate ||
           e06EntityCandidate ||
           searchReferenceCandidate ||
@@ -3058,8 +3014,7 @@ export default {
           (!blockAMixedFirstTurn || blockAComplexDialogue) &&
           !i32ExpectedContactOnly &&
           !(route === "unsupported" && classifyClearlyOffTopicRequest(message)) &&
-          (!deterministicEntityReady || blockAComplexDialogue) && !preInterpreterCompareDecision &&
-          !["refinement", "contextual_search", "recall", "entity_knowledge"].includes(searchTurnKind)
+          (!deterministicEntityReady || blockAComplexDialogue) && !preInterpreterCompareDecision
         ) {
           a1StartedAt = Date.now();
           personaA1 = await personaA1Generate({
@@ -3175,9 +3130,6 @@ export default {
 
                 conversation:
                   contextEnvelope?.conversation || null,
-
-                search:
-                  contextEnvelope?.search || null,
 
                 fallbackRoute:
                   route,
@@ -3411,19 +3363,6 @@ export default {
           }
         }
 
-        // An explicit refinement or project discovery is never an answer
-        // to a previous Compare clarification. Preserve search ownership;
-        // Interpreter still supplies changed filters and entity context.
-        if (["refinement", "contextual_search"].includes(searchTurnKind) &&
-            turn?.phase === "initial") {
-          route = "property_search";
-          interpreterClarification = null;
-        }
-        if (searchTurnKind === "recall" && searchRecallReference) {
-          route = "follow_up";
-          interpreterClarification = null;
-        }
-
         if (
           currentTurnSemanticProfileUpdate &&
           (!Array.isArray(resolvedInterpretation?.tasks) ||
@@ -3490,15 +3429,6 @@ export default {
           route =
             conversationMove
               .effective_route;
-        }
-        if (["refinement", "contextual_search"].includes(searchTurnKind) &&
-            turn?.phase === "initial") {
-          route = "property_search";
-          if (conversationMove?.effective_route !== "property_search") {
-            conversationMove = {version:"ConversationMoveV1",move_type:"refinement",
-              effective_route:"property_search",confidence:1,
-              reason:"new_search_request_over_stale_clarification",changed_fields:[]};
-          }
         }
 
 
@@ -3801,7 +3731,6 @@ export default {
 
 
         const resumedContextReference =
-          searchRecallReference ||
           buildResumedContextReferenceV1({
             message,
             conversationMove,
@@ -4688,7 +4617,6 @@ interpreterClarification =
           getToolIds(route);
 
         const needsSearchKnowledge =
-          !searchRecallReference &&
           shouldResolveSearchCandidateKnowledge({
             route,
             context:
@@ -4696,7 +4624,6 @@ interpreterClarification =
           });
 
         const needsKnowledge =
-          !searchRecallReference &&
           !interpreterClarification &&
           !needsSearchKnowledge &&
           !isGlobalNoKnowledgeGuard(

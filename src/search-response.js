@@ -103,6 +103,15 @@ function cardRefs(
               ""
             ),
 
+          // Preserve trusted catalog price facts for the standard D3 card.
+          // Never infer a price from a budget or search condition.
+          facts: {
+            title: String(item.title || ""),
+            district: String(item.district || ""),
+            developer: String(item.developer || ""),
+            price_display: String(item.price_display || "")
+          },
+
         rank:
           Number(
             item.rank ||
