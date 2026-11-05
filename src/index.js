@@ -1858,6 +1858,19 @@ export default {
 
       try {
         const workerTurnStartedAt = Date.now();
+        // P0-01: a completed, same-message project Search tool result is
+        // evidence of an already chosen action, not a new question to route.
+        // Do not confuse it with F1 recommendation or a stale search context.
+        const completedProjectSearchContinuationV1 =
+          turn?.phase === "tool_continuation" &&
+          body?.search_context?.version === "SearchContextV1" &&
+          body.search_context.language === "en" &&
+          body.search_context.entity_type === "project" &&
+          body.search_context.source !== "prima_f1_verified_project_catalog_v1" &&
+          body.search_context.query === message &&
+          ["results", "empty"].includes(body.search_context.state) &&
+          Array.isArray(body.search_context.results) &&
+          Boolean(normalizeSearchContextV1(body.search_context));
         // I33 DIAGNOSTICS-ONLY: timestamps, never user text, names or PII.
         // Disabled outside explicit PRIMA_PERSONA_DIAGNOSTICS=1 local QA.
         const i33Perf = env?.PRIMA_PERSONA_DIAGNOSTICS === "1" ? {} : null;
@@ -1932,7 +1945,7 @@ export default {
         );
 
         let route =
-          routeIntent(
+          completedProjectSearchContinuationV1 ? "property_search" : routeIntent(
             message,
             contextEnvelope
           );
@@ -2087,7 +2100,7 @@ export default {
           );
 
           route =
-            routeIntent(
+            completedProjectSearchContinuationV1 ? "property_search" : routeIntent(
               message,
               contextEnvelope
             );
@@ -2288,7 +2301,7 @@ export default {
           );
 
           route =
-            routeIntent(
+            completedProjectSearchContinuationV1 ? "property_search" : routeIntent(
               message,
               contextEnvelope
             );
@@ -2472,6 +2485,15 @@ export default {
               contextEnvelope,
             conversationMove
           });
+
+        // P0-01: Search tool continuation consumes its existing results.
+        // No second semantic call may reclassify it as Persona/Fact/Lead.
+        if (completedProjectSearchContinuationV1) {
+          fastGate = {
+            ...fastGate, decision: "execute", use_interpreter: false,
+            reason: "completed_project_search_continuation"
+          };
+        }
 
         // A-02/A-03: when a Persona-looking first request also asks for
         // actual buyer work, use the existing typed RequestInterpreter ONCE.
@@ -3911,6 +3933,13 @@ export default {
           route = g19ViewingInformationOnly
             ? "page_question"
             : p0BeforeDecision.naming ? "persona_question" : "unsupported";
+          interpreterClarification = null;
+        }
+        // P0-01: continuation is the completion of the existing Search,
+        // not a separate Persona turn. Keep the original action authoritative.
+        if (completedProjectSearchContinuationV1) {
+          route = "property_search";
+          conversationMove = null;
           interpreterClarification = null;
         }
         const nextAction =
