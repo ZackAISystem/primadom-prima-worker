@@ -242,7 +242,7 @@ function augmentSearchQueryWithMemory({
     Number.isInteger(bedrooms) &&
     bedrooms >= 0 &&
     bedrooms <= 20 &&
-    !/\b\d+\s*(?:br|bed|beds|bedroom|bedrooms)\b/i
+    !/\b(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*[- ]?\s*(?:br|bed|beds|bedroom|bedrooms)\b/i
       .test(q)
   ) {
     parts.push(
@@ -343,6 +343,43 @@ function augmentSearchQueryWithMemory({
 
 
 /*
+  P0-02: verified search state is the source of continuity for a refinement.
+  Canonical Client Memory may be absent on the stateless fast path, and may
+  contain older preferences. Never write these projected facts to Memory.
+  This helper is called ONLY for an already-confirmed active search refinement.
+*/
+function withVerifiedSearchSlotsV1(context = null) {
+  const request = context?.conversation?.dialogue_state?.request_state;
+  if (!request || typeof request !== "object" || Array.isArray(request)) {
+    return context;
+  }
+
+  const facts = Array.isArray(context?.memory?.active_facts)
+    ? context.memory.active_facts.slice() : [];
+  const put = (key, value) => {
+    if (value !== null && value !== undefined && value !== "") {
+      facts.push({fact_key:key, fact_value:value});
+    }
+  };
+  const type = String(request.property_type || "").trim().toLowerCase();
+  if (/^(?:apartment|villa|townhouse|penthouse|duplex|studio|plot)$/.test(type)) {
+    put("property_type", type);
+  }
+  const beds = request.bedrooms;
+  if (beds !== null && beds !== "" && Number.isInteger(Number(beds)) &&
+      Number(beds) >= 0 && Number(beds) <= 20) {
+    put("bedrooms", Number(beds));
+  }
+  put("preferred_location_text", normalizePreferredLocationTextV1(request.location));
+  const maximum = Number(request?.budget?.max_aed);
+  if (request?.budget?.max_aed != null &&
+      Number.isSafeInteger(maximum) && maximum > 0) {
+    put("budget_max_aed", maximum);
+  }
+  return {...context, memory:{...(context?.memory || {}), active_facts:facts}};
+}
+
+/*
   MEM06 — Explicit max-budget refinement at the Prima→Search boundary.
 
   The existing Search V3 parser can interpret conversational phrasing
@@ -365,10 +402,15 @@ function explicitMaxBudgetContinuation({
     /\b(?:everything\s+else|all\s+else|everything|the\s+rest)\s+(?:stays?|remains?|is)\s+(?:the\s+)?same\b/i.test(text) ||
     /\b(?:keep|leave)\s+(?:everything\s+else|all\s+else|everything|the\s+rest)\s+(?:the\s+)?same\b/i.test(text) ||
     /\b(?:no other changes|other criteria unchanged)\b/i.test(text);
+  // A budget-only refinement also means all other verified slots stay put.
+  // An explicit location/type/developer change is NOT a budget-only turn.
+  const budgetOnly =
+    (/\b(?:increase|raise|lower|reduce|change|adjust|update|set)\b[\s\S]{0,60}\b(?:budget|price\s+limit|ceiling)\b/i.test(text) ||
+     /\b(?:under|below|up\s+to|no\s+more\s+than|at\s+most)\b[\s\S]{0,18}\b(?:AED|DHS?|DH)\b/i.test(text)) &&
+    !/\b(?:in|near|around|at)\s+(?!the\s+same\b)[A-Za-z][A-Za-z -]{2,65}/i.test(text) &&
+    !/\b(?:developer|builder|by\s+[A-Z][a-z])\b/i.test(text);
 
-  if (!sameOtherCriteria) {
-    return null;
-  }
+  if (!sameOtherCriteria && !budgetOnly) return null;
 
   // Do not silently erase another new criterion from a mixed message.
   if (
@@ -381,7 +423,9 @@ function explicitMaxBudgetContinuation({
 
   // An explicit upper limit — not merely "my budget is around 5M".
   const matched = text.match(
-    /\b(?:increase|raise|lower|reduce|change|adjust|update|set)\s+(?:my|our|the)\s+(?:maximum|max)\s+budget\s+(?:to|at)\s*(?:(?:AED|DHS?|DH)\s*)?([\d,]+(?:\.\d+)?)\s*(millions?|m|thousands?|k)?\b/i
+    /\b(?:increase|raise|lower|reduce|change|adjust|update|set)\s+(?:(?:my|our|the)\s+)?(?:(?:maximum|max)\s+)?budget\s+(?:to|at)\s*(?:(?:AED|DHS?|DH)\s*)?([\d,]+(?:\.\d+)?)\s*(millions?|m|thousands?|k)?\b/i
+  ) || text.match(
+    /\b(?:under|below|up\s+to|no\s+more\s+than|at\s+most)\s*(?:(?:AED|DHS?|DH)\s*)?([\d,]+(?:\.\d+)?)\s*(millions?|m|thousands?|k)?\b/i
   );
 
   if (!matched) {
@@ -605,20 +649,29 @@ export function buildPrimaSearchRequest({
   const savedSearch =
     context?.conversation?.dialogue_state
       ?.continuity_references?.active_search_context;
+  const turnText = String(message || "");
+  // A new explicit search must never inherit filters from an earlier search.
+  const explicitReset =
+    /\b(?:forget|ignore|discard|clear|reset)\b[\s\S]{0,55}\b(?:previous|old|past|earlier|prior|search|criteria|results|projects|properties)\b/i.test(turnText) ||
+    /\b(?:start over|start fresh|new search|without restricting the developer)\b/i.test(turnText);
   const continuingPreviousSearch =
+    !explicitReset &&
     savedSearch?.state === "results" &&
     Number(savedSearch?.result_count) > 0 &&
     context?.conversation?.dialogue_state?.active_thread
       ?.active_topic === "property_search" &&
-    /\b(?:same|those|these|previous|earlier|last|remaining|keep|still|more|only|them|ones|refine|change|lower|increase|reduce|update)\b/i
-      .test(String(message || "")) &&
-    !/\b(?:similar\s+to|cheaper\s+than)\s+[A-Z]/i
-      .test(String(message || ""));
+    /\b(?:same|those|these|previous|earlier|last|remaining|keep|still|more|only|them|ones|refine|change|lower|increase|reduce|update|raise|adjust|budget)\b/i
+      .test(turnText) &&
+    // A fresh named-area search must not inherit the previous constraints.
+    (!/\b(?:in|near|around)\s+(?!the\s+same\b|same\b|that\b|this\b|previous\b)[a-z][a-z0-9 '&-]{2,}/i.test(turnText) ||
+      /\b(?:keep|same|unchanged|still)\b/i.test(turnText)) &&
+    !/\b(?:similar\s+to|cheaper\s+than)\s+[A-Z]/i.test(turnText);
+  const continuationContext = continuingPreviousSearch
+    ? withVerifiedSearchSlotsV1(context) : context;
 
-  const exactMaxRefinement =
-    continuingPreviousSearch
-      ? explicitMaxBudgetContinuation({message, context})
-      : null;
+  const exactMaxRefinement = continuingPreviousSearch
+    ? explicitMaxBudgetContinuation({message, context:continuationContext})
+    : null;
 
   const personalized = recommendationSearch
     ? personalizedRecommendationV1({message, context})
@@ -627,7 +680,7 @@ export function buildPrimaSearchRequest({
     personalized?.query ||
     exactMaxRefinement ||
     (continuingPreviousSearch
-      ? augmentSearchQueryWithMemory({query: contextualQuery, context})
+      ? augmentSearchQueryWithMemory({query: contextualQuery, context:continuationContext})
       : contextualQuery);
 
   if (!query) {
