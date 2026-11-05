@@ -875,6 +875,39 @@ export function evaluateFastGate({
     };
   }
 
+  // P003D_SAFE_INITIAL_SEARCH_V1
+  // Only a first-turn, single-action EN project discovery may skip the
+  // RequestInterpreter. All conditions/parameters go to the EXISTING Search V3
+  // verbatim; this gate does not parse filters or generate response content.
+  // Never apply to continuations, entity fact lookups, name introductions,
+  // recommendations, exclusions, comparisons or compound asks.
+  const firstTurnSimpleProjectSearch =
+    route === "property_search" &&
+    context?.turn?.phase === "initial" &&
+    context?.turn?.turn_seq === 1 &&
+    context?.page?.language_code === "en" &&
+    !context?.search?.version &&
+    !context?.conversation?.dialogue_state?.active_thread?.active_topic &&
+    text.length > 15 && text.length <= 200 &&
+    /^[\x20-\x7E]+$/.test(text) &&
+    /^(?:show(?:\s+me)?|find(?:\s+me)?|search\s+for|i(?:'m|\s+am)\s+looking\s+for|we(?:'re|\s+are)\s+looking\s+for)\s+/i.test(text) &&
+    /\b(?:properties|property|apartments?|villas?|townhouses?|homes?|penthouses?|residences?)\b/i.test(text) &&
+    !/[?;:\n]/.test(text) &&
+    !/\b(?:and|but|also|plus|as well as|together with|or|however|instead|except|excluding|exclude|without|avoid|no|not|never|only|prefer|preferably|ideally|rather|near|around|similar|same|other|another|different|more|previous|earlier|last|again|before|after|between|if|unless|while)\b/i.test(text) &&
+    !/\b(?:recommend|suggest|shortlist|compare|comparison|versus|vs|why|explain|what|who|which|when|how|where|assess|analy[sz]e|evaluate|should|would|could|best|worth|roi|risk|investment|investor|returns?|profit|mortgage|advisor|broker|book|schedule|viewing|contact|call|whatsapp|email|my name|call me|i'm [a-z]+,|i am [a-z]+,)\b/i.test(text) &&
+    !contact;
+
+  if (firstTurnSimpleProjectSearch) {
+    return {
+      version: "FastGateV1",
+      decision: "execute",
+      use_interpreter: false,
+      reason: "p003d_safe_initial_project_search",
+      entity,
+      exact_facts: exactFacts
+    };
+  }
+
   // -------------------------------------------------------
   // SEMANTIC / AMBIGUOUS REQUEST
   //
