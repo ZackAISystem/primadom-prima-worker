@@ -1783,6 +1783,7 @@ export default {
         );
       }
 
+      const p003RequestReceivedAt = Date.now();
       // H-SECURITY-V1: a conversation UUID is not proof of ownership.
       // Validate before any Memory, messages or conversation state is read.
       if (!(await verifyConversationAccess(request, env, conversationId))) {
@@ -1858,6 +1859,12 @@ export default {
 
       try {
         const workerTurnStartedAt = Date.now();
+        const p003 = {
+          auth_ms: workerTurnStartedAt - p003RequestReceivedAt,
+          context_load_ms: null,
+          knowledge_wait_ms: null,
+          state_write_ms: null
+        };
         // P0-01: a completed, same-message project Search tool result is
         // evidence of an already chosen action, not a new question to route.
         // Do not confuse it with F1 recommendation or a stale search context.
@@ -2113,6 +2120,7 @@ export default {
           if (h29Direct.direct_request) route = "contact_intent";
         } else if (!statelessFastPath) {
           i33Mark("context_load_start");
+          const p003ContextStart = Date.now();
           const [
             memoryBeforeTurn,
             fullContextEnvelope
@@ -2130,6 +2138,7 @@ export default {
             )
           ]);
           i33Mark("context_load_end");
+          p003.context_load_ms = Date.now() - p003ContextStart;
 
           const expectingName =
             isExpectingNameFromRecentMessages(
@@ -4705,7 +4714,11 @@ interpreterClarification =
               persona_a1_total_tokens: personaA1?.usage?.total_tokens ?? null,
               persona_a1_usage_unknown: Boolean(personaA1?.usage_unknown),
               total_openai_tokens: personaA1?.usage?.total_tokens ?? 0,
-              openai_calls_attempted: Number(Boolean(personaA1?.used))
+              openai_calls_attempted: Number(Boolean(personaA1?.used)),
+              p003_perf: {
+                ...p003,
+                total_worker_ms: Date.now() - p003RequestReceivedAt
+              }
             }
           });
         }
@@ -4775,6 +4788,7 @@ interpreterClarification =
                 null
               );
 
+        const p003KnowledgeStart = Date.now();
         let [
           knowledgePack,
           deferredMemoryBeforeTurn,
@@ -4791,6 +4805,7 @@ interpreterClarification =
           projectCardFactsTask
         ]);
 
+        p003.knowledge_wait_ms = Date.now() - p003KnowledgeStart;
         knowledgePack =
           mergeSearchCandidateKnowledge(
             knowledgePack,
@@ -6096,6 +6111,7 @@ response.meta.used_search =
         };
 
         i33Mark("state_write_start");
+        const p003StateWriteStart = Date.now();
         if (conversationOrdering.guarded) {
           const conversationStateRows =
             await supabaseUpdateReturning(
@@ -6138,6 +6154,7 @@ response.meta.used_search =
 
 
         i33Mark("state_write_end");
+        p003.state_write_ms = Date.now() - p003StateWriteStart;
 
         // H2_VERIFIED_CONTACT_PERSISTENCE_V1
         // Only contact turns wait for durable contact + lead writes.
@@ -6518,6 +6535,12 @@ response.meta.used_search =
         }
 
         responsePayload.meta.worker_total_ms = Date.now() - workerTurnStartedAt;
+        if (route === "property_search") {
+          responsePayload.meta.p003_perf = {
+            ...p003,
+            total_worker_ms: Date.now() - p003RequestReceivedAt
+          };
+        }
         // I33: local-only console measurement. Strictly no PII, request text,
         // contact data, conversation IDs or object names in this record.
         if (contactDecision.captured && i33Perf) {
