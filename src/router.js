@@ -189,7 +189,8 @@ export function routeIntent(
     !explicitRecommendationAction &&
     (
       /^(?:my|our)\s+(?:budget|price range|preferred (?:area|location)|preferences?)\s+(?:is|are|would be|has changed to)\b/i.test(q) ||
-      /^i(?:'m| am)\s+(?:interested in|planning to buy|hoping for)\b/i.test(q)
+      /^i(?:'m| am)\s+(?:planning to buy|hoping for)\b/i.test(q) &&
+      !/\b(?:apartments?|villas?|projects?|properties|homes?|residences?|townhouses?)\b/i.test(q)
     );
   if (profileDeclaration) {
     return "persona_question";
@@ -422,8 +423,16 @@ export function routeIntent(
   // PROPERTY DISCOVERY / SEARCH
   // -------------------------------------------------------
 
+  // P0-01: a concrete buyer search expressed as "I'm interested in..."
+  // remains Search, not Persona, market commentary or an exact fact.
+  const concreteBuyerInterest =
+    /^i(?:'m| am)\s+interested in\b/i.test(q) &&
+    /\b(?:apartments?|villas?|townhouses?|properties|projects?|homes?|residences?)\b/i.test(q) &&
+    /\b(?:under|below|near|around|aed|bedrooms?|in\s+\w+|at\s+\w+)\b/i.test(q);
+
   if (
     explicitPropertyDiscovery ||
+    concreteBuyerInterest ||
     /\b(find|show me|show\s+(?:3|three)\s+more|looking for|search for|give me options|show options|projects under|properties under|apartments under|villas under|townhouses under)\b/i.test(q)
   ) {
     return "property_search";
