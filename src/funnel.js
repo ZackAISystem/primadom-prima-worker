@@ -205,6 +205,14 @@ export function explicitHandoffRequest(
   const text =
     String(message).trim();
 
+  // P0-05 / N06: 'you can call me Zack' introduces a name. It is NOT
+  // an invitation to telephone the user. Preserve explicit requests for
+  // a specialist, connection, WhatsApp, email or a callback in the same turn.
+  // Do not infer consent from a bare 'call me <person name>'.
+  const nameIntroduction = /\b(?:you\s+(?:can|may)\s+)?call\s+me\s+(?!back\b|later\b|tomorrow\b|today\b|now\b|soon\b|at\b|on\b|when\b|about\b|again\b)[\p{L}][\p{L}\p{M}'’-]{1,35}(?=\s*(?:$|[.!?,]|\s+(?:for|in|from|instead|please|and)\b))/iu.test(text);
+  const separateContactRequest = /\b(?:please\s+)?(?:connect|put)\s+me\s+(?:with|in\s+touch\s+with)\b|\b(?:contact|reach|whatsapp|email)\s+me\b|\b(?:call|phone)\s+me\s+(?:back|at|on|later|tomorrow|today|now)\b|\b(?:book|arrange|schedule)\s+(?:a\s+)?viewing\b|\b(?:speak|talk)\s+(?:with|to)\s+(?:(?:an?|your|the)\s+)?(?:agent|advisor|specialist|broker|team|office)\b|\b(?:give\s+me\s+a\s+call|request\s+a\s+callback)\b/i.test(text);
+  if (nameIntroduction && !separateContactRequest) return false;
+
   return (
     /\b(?:call|contact)\s+me\b/i
       .test(text) ||

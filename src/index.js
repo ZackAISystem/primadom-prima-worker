@@ -524,16 +524,23 @@ function p003ProjectCandidateNameV1(message, interpretation) {
   const text = String(message || "");
   const mention = text.match(/\b(?:interested in|considering|asking about|looking at|regarding)\s+(?:the\s+)?([^.!?]{3,95})(?=[.!?]|$)/i);
   const question = text.match(/\bwho\s+(?:built|developed)\s+(?:the\s+)?([^,.!?]{3,95}?)\s+(?:and|,)/i);
-  const name = String(mention?.[1] || question?.[1] || "").trim();
+  // P0-04 C02: indirect named project reference. Resolve the PROJECT name
+  // through Registry; never infer its developer from this text.
+  const behind = text.match(/\b(?:company|developer|builder)\s+behind\s+(?:the\s+)?(.+?)\s+(?:have|has|built|developed|created|offer|offers|own|owns)\s*[?.!]*$/i);
+  const name = String(mention?.[1] || question?.[1] || behind?.[1] || "").trim();
   if (name && !/\b(?:developer|company|builder|projects?|properties)\b/i.test(name)) return name;
   return unique ? String(unique.name || unique.slug).trim() : null;
 }
 
 function p003RelatedRequestV1(message) {
   const text = String(message || "");
-  return /\b(?:developer|builder|company)\b/i.test(text) &&
+  const explicitDependency = /\b(?:developer|builder|company)\b/i.test(text) &&
     /\b(?:what else|other|more)\b/i.test(text) &&
     /\b(?:who built|who developed|who is behind|built by|developed by)\b/i.test(text);
+  // A second bounded grammar delegates to the SAME verified relationship
+  // resolver. No special-cased project or developer names.
+  const behindDependency = /\b(?:what|which|show|list|find)\b[\s\S]{0,110}\b(?:other|more)\b[\s\S]{0,110}\b(?:company|developer|builder)\s+behind\s+[^.!?]{2,95}\b(?:have|has|built|developed|created|offer|offers|own|owns)\s*[?.!]*$/i.test(text);
+  return explicitDependency || behindDependency;
 }
 
 async function p003VerifiedRelationshipV1({env, message, interpretation, context}) {
