@@ -121,6 +121,7 @@ import {
   persistPrimaLeadV1
 } from "./prima-lead.js";
 import {
+  supabaseRpc,
   supabaseInsert,
   supabaseInsertIdempotentMessage,
   supabaseInsertIdempotentEvent,
@@ -509,6 +510,70 @@ function isUnconsentedProjectViewingQuestionV1({message = "", context = null, au
   return viewing && property && feasibility && !directArrangement && !selectionTask;
 }
 // END_G19_PROPERTY_VIEWING_SCOPE_RECOVERY_V1
+
+// P0-03B: bounded multi-action Project -> verified Developer -> existing D6.
+// Source project must resolve uniquely in Registry. Never infer a developer
+// from a prompt, an unrelated conversation entity, or a partial search result.
+function p003ProjectCandidateNameV1(message, interpretation) {
+  const entities = Array.isArray(interpretation?.entities)
+    ? interpretation.entities.filter(e => e?.type === "project" && (e?.name || e?.slug))
+    : [];
+  const primary = entities.filter(e => e?.role === "primary");
+  const unique = primary.length === 1 ? primary[0]
+    : entities.length === 1 ? entities[0] : null;
+  const text = String(message || "");
+  const mention = text.match(/\b(?:interested in|considering|asking about|looking at|regarding)\s+(?:the\s+)?([^.!?]{3,95})(?=[.!?]|$)/i);
+  const question = text.match(/\bwho\s+(?:built|developed)\s+(?:the\s+)?([^,.!?]{3,95}?)\s+(?:and|,)/i);
+  const name = String(mention?.[1] || question?.[1] || "").trim();
+  if (name && !/\b(?:developer|company|builder|projects?|properties)\b/i.test(name)) return name;
+  return unique ? String(unique.name || unique.slug).trim() : null;
+}
+
+function p003RelatedRequestV1(message) {
+  const text = String(message || "");
+  return /\b(?:developer|builder|company)\b/i.test(text) &&
+    /\b(?:what else|other|more)\b/i.test(text) &&
+    /\b(?:who built|who developed|who is behind|built by|developed by)\b/i.test(text);
+}
+
+async function p003VerifiedRelationshipV1({env, message, interpretation, context}) {
+  const name = p003ProjectCandidateNameV1(message, interpretation);
+  if (!name || name.length > 95) return null;
+  const resolution = await resolveNamedEntity({
+    env, candidate: {type:"project", name, role:"primary", source:"p003_registry_required"},
+    context, route:"page_question"
+  });
+  // Do not trust the `current_entity` shortcut; require a canonical page row.
+  const page = resolution?.resolved ? resolution.page : null;
+  if (page?.page_type_id !== "project_page" ||
+      page?.primary_entity_type !== "project" ||
+      page?.language_code !== "en" ||
+      !page?.page_id ||
+      !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(String(page.primary_entity_slug || ""))) return null;
+  const projectSlug = page.primary_entity_slug;
+  const bundle = await supabaseRpc(env, "resolve_knowledge_bundle_v2", {
+    p_page_id:page.page_id, p_project_slug:projectSlug,
+    p_language_code:"en", p_current_families:["key_facts"],
+    p_district_families:[], p_conversation_id:null
+  });
+  const relation = bundle?.relation;
+  // A relation must be attached to this exact verified project.
+  if (!relation || relation.project_slug !== projectSlug) return null;
+  const developerName = String(relation.developer_name || "").trim();
+  const developerSlug = String(relation.developer_slug || "").trim();
+  if (!developerName || developerName.length > 120 ||
+      !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(developerSlug) ||
+      /[\r\n<>]/.test(developerName)) return null;
+  // The geographic qualifier is supplied by the user, not fabricated from
+  // the source project's district (which may not be their desired area).
+  const location = String(message || "")
+    .match(/\b(?:in|on|within)\s+([a-z][a-z0-9 &'’.-]{2,75})\s*[?.!]*$/i)?.[1]?.trim() || "";
+  const safeLocation = location && !/\b(?:developer|company|builder|project)\b/i.test(location)
+    ? location : "";
+  const query = `Show me projects by ${developerName}${safeLocation ? ` in ${safeLocation}` : ""}`;
+  return {projectSlug, projectName:name, developerName, developerSlug,
+    location:safeLocation, query, resolution};
+}
 
 function emptyKnowledgePack(route) {
   return {
@@ -2495,6 +2560,25 @@ export default {
             conversationMove
           });
 
+        // P0-03A: A compound project-to-developer relationship question is
+        // not a generic D4 developer directory request. Delegate semantic
+        // understanding to the existing Interpreter; do not infer identities.
+        // The relationship execution itself remains P0-03B (separate QA).
+        const p003RelatedProjectRequest =
+          turn?.phase === "initial" &&
+          ["exact_fact", "page_question"].includes(route) &&
+          /\b(?:developer|builder|company)\b/i.test(message) &&
+          /\b(?:what else|other|more)\b/i.test(message) &&
+          /\b(?:who built|who developed|who is behind|built by|developed by)\b/i.test(message);
+        if (p003RelatedProjectRequest) {
+          fastGate = {
+            ...fastGate,
+            decision: "interpret",
+            use_interpreter: true,
+            reason: "p003_compound_project_developer_relationship"
+          };
+        }
+
         // P0-01: Search tool continuation consumes its existing results.
         // No second semantic call may reclassify it as Persona/Fact/Lead.
         if (completedProjectSearchContinuationV1) {
@@ -4423,6 +4507,51 @@ interpreterClarification =
             route === "recommendation"
           );
 
+        // P0-03B verified relationship dispatch. No mutations or Search
+        // on ambiguous/missing canonical project/relation; existing routes win.
+        const p003BActive = p003RelatedRequestV1(message) &&
+          (turn?.phase === "initial" || turn?.phase === "tool_continuation") &&
+          (turn?.phase === "initial" ||
+            (body?.search_context?.version === "SearchContextV1" &&
+             body?.search_context?.entity_type === "project" &&
+             ["results","empty"].includes(body?.search_context?.state)));
+        let p003BRelation = null;
+        if (p003BActive) {
+          try {
+            p003BRelation = await p003VerifiedRelationshipV1({
+              env, message, interpretation:resolvedInterpretation,
+              context:contextEnvelope
+            });
+          } catch (error) {
+            console.error("p003_relationship_resolution_unavailable");
+          }
+        }
+        // Continuations must correspond to the exact original user turn or
+        // the verified canonical query, never an arbitrary search response.
+        const p003BContinuationVerified = Boolean(
+          p003BRelation && turn?.phase === "tool_continuation" &&
+          body?.search_context?.version === "SearchContextV1" &&
+          body?.search_context?.language === "en" &&
+          body?.search_context?.entity_type === "project" &&
+          ["results","empty"].includes(body?.search_context?.state) &&
+          Array.isArray(body?.search_context?.results) &&
+          [message,p003BRelation.query].includes(body?.search_context?.query)
+        );
+        if (p003BRelation &&
+            (turn?.phase === "initial" || p003BContinuationVerified)) {
+          route = "property_search";
+          // Keep original request for continuity and preserve the real
+          // confirmed project for Knowledge, not the user's ambient page.
+          entityResolution = p003BRelation.resolution;
+          knowledgeContextEnvelope = buildKnowledgeContext(
+            contextEnvelope, p003BRelation.resolution
+          );
+          contextEnvelope.working_entity = {
+            type:"project", slug:p003BRelation.projectSlug,
+            name:p003BRelation.projectName
+          };
+        }
+
         // D4 local preview — direct Developer Registry search.
         // D4 preview: direct developer discovery by generic request
         // or by a name that actually exists in Supabase Registry.
@@ -4529,6 +4658,7 @@ interpreterClarification =
         // "same developer" are PROJECT search, not developer discovery.
         // This is entity-type precedence, independent of word order.
         const d4FacetedDevelopers =
+          !p003RelatedProjectRequest &&
           /\bdevelopers?\b/i.test(d4Text) &&
           !/\b(?:projects?|properties|apartments?|villas?|townhouses?|penthouses?|residences?)\b/i.test(d4Text) &&
           /\b(?:abu dhabi|dubai|sharjah|ajman|fujairah|ras al khaimah|umm al quwain|in|with|under|below|over|above|aed|villas?|apartments?|budget|bedrooms?)\b/i.test(d4Text);
@@ -4642,7 +4772,13 @@ interpreterClarification =
           });
 
         const primaSearchRequest =
-          d4PortfolioVerified
+          (p003BRelation && turn?.phase === "initial")
+            ? {
+                version:"PrimaToolRequestV1", tool:"prima_search",
+                action:"search_projects", language:"en", entity_type:"project",
+                query:p003BRelation.query, max_results:10
+              }
+          : d4PortfolioVerified
             ? {
                 version: "PrimaToolRequestV1",
                 tool: "prima_search",
@@ -5812,6 +5948,17 @@ interpreterClarification =
           funnelDecision
             .lead_action ||
           null;
+
+        // P0-03B: combine the verified first fact with existing project cards.
+        // No separate Composer, no fabricated projects, no consent/CTA changes.
+        if (p003BContinuationVerified &&
+            response.response_type === "search_results" &&
+            Array.isArray(response.cards) &&
+            !contactDecision?.captured && !funnelDecision?.lead_action &&
+            typeof response.answer === "string") {
+          const prefix = `${p003BRelation.projectName} was developed by ${p003BRelation.developerName}.`;
+          response.answer = prefix + "\n\n" + response.answer;
+        }
 
         // Final serialization guard. This is deliberately downstream of every
         // other response modifier and upstream of persistence, so neither a
