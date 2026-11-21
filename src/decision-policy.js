@@ -19,11 +19,14 @@ export function decideNextActionV1({
   conversationMove = null,
   interpretation = null,
   clarification = null,
-  lunaDecision = null
+  lunaDecision = null,
+  lunaInterpretation = null
 } = {}) {
   const planned=lunaDecision?.next_action;
-  // The model proposes intent/action; the Worker validates the combination.
-  // Never authorize Contact or an unverified Reference through the model.
+  // V1.2 S3.1: the model's *validated semantic route* is authoritative for
+  // action selection. The old Router route is a recovery hint, not a veto.
+  // This does not grant the model authority over Contact, Registry identity,
+  // consent, verified facts, or any executor. Those stay in the Worker.
   const routeActions={
     property_search:new Set(["SEARCH","CLARIFY"]),
     recommendation:new Set(["ADVISORY","SEARCH","CLARIFY"]),
@@ -35,18 +38,26 @@ export function decideNextActionV1({
     follow_up:new Set(["ADVISORY","CLARIFY"]),
     unsupported:new Set(["CLARIFY"])
   };
-  const matchesRoute=interpretation?.primary_route===route;
+  const authoritativeInterpretation=lunaInterpretation || interpretation;
   const isPureProfile=planned==="PROFILE_UPDATE" &&
-    interpretation?.turn_kind==="profile_update" &&
-    Array.isArray(interpretation?.tasks) && interpretation.tasks.length===0 &&
-    (Array.isArray(interpretation?.memory_candidates) &&
-      interpretation.memory_candidates.length>0 ||
+    authoritativeInterpretation?.turn_kind==="profile_update" &&
+    Array.isArray(authoritativeInterpretation?.tasks) && authoritativeInterpretation.tasks.length===0 &&
+    (Array.isArray(authoritativeInterpretation?.memory_candidates) &&
+      authoritativeInterpretation.memory_candidates.length>0 ||
      Array.isArray(lunaDecision?.changes) && lunaDecision.changes.length>0);
-  if(Number(lunaDecision?.confidence)>=0.70 &&
-     route!=="contact_intent" && matchesRoute &&
-     (routeActions[route]?.has(planned) || isPureProfile)) {
+  // Do not let a model decision override explicit contact routing, including
+  // a contact route promoted by the Consent gate downstream of interpretation.
+  // REFERENCE is deliberately excluded: verified references have their own path.
+  const semanticRoute=lunaInterpretation?.primary_route;
+  const safeSemanticChoice=
+    Number(lunaDecision?.confidence)>=0.70 &&
+    route!=="contact_intent" &&
+    semanticRoute!=="contact_intent" &&
+    Object.prototype.hasOwnProperty.call(routeActions,semanticRoute) &&
+    (routeActions[semanticRoute].has(planned) || isPureProfile);
+  if(safeSemanticChoice) {
     return {version:"DecisionPolicyV1",action:planned,
-      reason:"luna_validated_route_action_v12"};
+      reason:"luna_validated_semantic_action_v12"};
   }
   if (route === "persona_question") {
     return {

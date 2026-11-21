@@ -2071,9 +2071,14 @@ export default {
           return json(mem07Response);
         }
 
+        // S3.1: preserve the authorized, already-loaded memory for the whole
+        // turn. Previously this reset the model's semanticMemory to only the
+        // current message immediately after Luna had used the full history.
+        // Clear masks are applied before merging; no second memory store.
         let activeMemory =
           mergeCurrentTurnMemory(
-            [],
+            lunaHumanTurnV12 && Array.isArray(lunaStoredMemoryV12)
+              ? lunaStoredMemoryV12 : [],
             extractedFacts
           );
 
@@ -4187,7 +4192,19 @@ export default {
               resolvedInterpretation,
             clarification:
               interpreterClarification,
-            lunaDecision:contextEnvelope?.luna_decision_v12 || null
+            // Only an actual, successful typed Luna interpretation can
+            // control the semantic action. Never derive this from a legacy
+            // Interpreter interpretation or a Search tool continuation.
+            lunaDecision:personaA1?.decision==="route" &&
+              lunaMaySteerV12 && !completedProjectSearchContinuationV1 &&
+              !p0BeforeDecision.explicitRequest &&
+              !resumedContextReference
+                ? contextEnvelope?.luna_decision_v12 || null : null,
+            // Action validation uses Luna's own route, NOT a later legacy
+            // route that may have overwritten it during execution planning.
+            lunaInterpretation:personaA1?.decision==="route" &&
+              lunaMaySteerV12
+                ? personaA1.interpretation : null
           });
 
         route =
