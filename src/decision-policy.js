@@ -4,6 +4,8 @@ export const NEXT_ACTIONS_V1 =
     KNOWLEDGE_QA: "KNOWLEDGE_QA",
     SEARCH: "SEARCH",
     PAGE_MORE: "PAGE_MORE",
+    MEMORY_RECALL: "MEMORY_RECALL",
+    RESUME_SEARCH: "RESUME_SEARCH",
     COMPARE: "COMPARE",
     ADVISORY: "ADVISORY",
     PROFILE_UPDATE: "PROFILE_UPDATE",
@@ -29,14 +31,14 @@ export function decideNextActionV1({
   // This does not grant the model authority over Contact, Registry identity,
   // consent, verified facts, or any executor. Those stay in the Worker.
   const routeActions={
-    property_search:new Set(["SEARCH","CLARIFY","PAGE_MORE"]),
-    recommendation:new Set(["ADVISORY","SEARCH","CLARIFY","PAGE_MORE"]),
+    property_search:new Set(["SEARCH","CLARIFY","PAGE_MORE","RESUME_SEARCH"]),
+    recommendation:new Set(["ADVISORY","SEARCH","CLARIFY","PAGE_MORE","MEMORY_RECALL","RESUME_SEARCH"]),
     compare:new Set(["COMPARE","CLARIFY"]),
     exact_fact:new Set(["EXACT_FACT","KNOWLEDGE_QA","CLARIFY"]),
     page_question:new Set(["KNOWLEDGE_QA","CLARIFY"]),
     market_question:new Set(["KNOWLEDGE_QA","CLARIFY"]),
     persona_question:new Set(["PERSONA","CLARIFY"]),
-    follow_up:new Set(["ADVISORY","CLARIFY","PAGE_MORE"]),
+    follow_up:new Set(["ADVISORY","CLARIFY","PAGE_MORE","MEMORY_RECALL","RESUME_SEARCH"]),
     unsupported:new Set(["CLARIFY"])
   };
   const authoritativeInterpretation=lunaInterpretation || interpretation;
@@ -237,7 +239,8 @@ export function routeForNextActionV1(
       return "property_search";
 
     case NEXT_ACTIONS_V1.PAGE_MORE:
-      // Pagination is executed through the verified SearchContext batch.
+    case NEXT_ACTIONS_V1.RESUME_SEARCH:
+      // Pagination/restoration are executed through the verified SearchContext batch.
       // Without it the worker must not create a new catalog query.
       return "follow_up";
 
@@ -251,6 +254,10 @@ export function routeForNextActionV1(
       ].includes(currentRoute)
         ? currentRoute
         : "recommendation";
+
+    case NEXT_ACTIONS_V1.MEMORY_RECALL:
+      // Personal memory recap is not an entity reference or catalog search.
+      return "follow_up";
 
     case NEXT_ACTIONS_V1.PROFILE_UPDATE:
       // Reuse an existing zero-tool route for acknowledging pure memory.

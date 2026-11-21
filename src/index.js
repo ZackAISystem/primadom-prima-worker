@@ -1877,7 +1877,7 @@ export default {
             turn
           })
         : null;
-      const deliverVerifiedPaginationD2 = async (paginationFast, semantic = false) => {
+      const deliverVerifiedPaginationD2 = async (paginationFast, semantic = false, semanticAction = "PAGE_MORE") => {
         const startedAt = Date.now();
         const ordering = buildConversationOrderingV1({conversationId, turn});
         // Require monotonic turn ordering: no optimistic reply on an
@@ -1920,7 +1920,7 @@ export default {
           ...response.meta,used_database:true,used_search:true,
           used_openai:false,used_interpreter:false,used_final_openai:false,
           total_openai_tokens:0,openai_calls_attempted:0,
-          next_action:semantic ? "PAGE_MORE" : "SEARCH",
+          next_action:semantic ? semanticAction : "SEARCH",
           next_action_reason:semantic ? "luna_verified_pagination_v12" : "verified_pagination_fastpath",
           worker_total_ms:Date.now()-startedAt
         };
@@ -1971,7 +1971,7 @@ export default {
           "contact_intent","unsupported"];
         const d0Actions = ["SEARCH","ADVISORY","CLARIFY","PERSONA",
           "PROFILE_UPDATE","CONTACT","REFERENCE","COMPARE","EXACT_FACT","PAGE_MORE",
-          "KNOWLEDGE_QA","OFF_TOPIC"];
+          "KNOWLEDGE_QA","OFF_TOPIC","MEMORY_RECALL","RESUME_SEARCH"];
         const d0Emit = stage => {
           if (d0Trace) console.info("PRIMA_V12_TURN_TRACE", JSON.stringify({...d0Trace,stage}));
         };
@@ -4228,7 +4228,7 @@ export default {
           conversationMove = null;
           interpreterClarification = null;
         }
-        const nextAction =
+        let nextAction =
           resumedContextReference
             ? {
                 version: "DecisionPolicyV1",
@@ -4258,6 +4258,21 @@ export default {
                 ? personaA1.interpretation : null
           });
 
+        // D2.1: A typed non-search action must never silently turn into SEARCH
+        // if its provenance or validation fails. Reject safely instead of
+        // executing a different tool. Explicit Contact retains its own gate.
+        const semanticNonSearchAction = personaA1?.decision === "route" &&
+          lunaMaySteerV12 && !p0BeforeDecision.explicitRequest &&
+          turn?.phase === "initial" &&
+          ["PAGE_MORE", "RESUME_SEARCH", "MEMORY_RECALL"].includes(
+            personaA1?.interpretation?.luna_decision?.next_action)
+            ? personaA1.interpretation.luna_decision.next_action : null;
+        if (semanticNonSearchAction && nextAction?.action !== semanticNonSearchAction &&
+            nextAction?.action === "SEARCH") {
+          nextAction = {version:"DecisionPolicyV1",action:"CLARIFY",
+            reason:"semantic_action_not_accepted"};
+        }
+
         if (d0Trace) {
           d0Trace.pre_policy_route = d0Enum(route, d0Routes);
           d0Trace.luna_submitted = Boolean(
@@ -4273,7 +4288,8 @@ export default {
             "contact_route","semantic_request_unresolved","knowledge_question_route",
             "open_conversation_follow_up","clarification_route",
             "no_actionable_route","unknown_route_safe_fallback",
-            "resumed_conversation_context_reference"]);
+            "resumed_conversation_context_reference",
+            "semantic_action_not_accepted"]);
         }
         route =
           routeForNextActionV1(
@@ -4285,23 +4301,64 @@ export default {
         // button. Never reinterpret the request as a fresh catalog search.
         // The validator checks the supplied SearchContextV1 and monotonic
         // turn ordering before any persisted state/message write.
-        if (nextAction?.action === "PAGE_MORE" && turn?.phase === "initial") {
+        if (["PAGE_MORE", "RESUME_SEARCH"].includes(nextAction?.action) &&
+            turn?.phase === "initial") {
           const existingBatch = body?.search_context;
-          const verifiedBatch = prepareFastProjectPaginationV1({
-            message: "Show 3 more", // canonical command for existing paginator
-            context: normalizeSearchContextV1(existingBatch),
-            original: existingBatch,
-            turn
-          });
+          const normalizedBatch = normalizeSearchContextV1(existingBatch);
+          let verifiedBatch = null;
+          if (nextAction.action === "PAGE_MORE") {
+            // Use the exact paginator already used by the UI button.
+            verifiedBatch = prepareFastProjectPaginationV1({
+              message: "Show 3 more", context: normalizedBatch,
+              original: existingBatch, turn
+            });
+          } else if (
+            existingBatch?.source === "primadom_project_search_v3" &&
+            existingBatch?.version === "SearchContextV1" &&
+            existingBatch?.language === "en" &&
+            existingBatch?.entity_type === "project" &&
+            existingBatch?.state === "results" &&
+            normalizedBatch?.source === "primadom_project_search_v3" &&
+            normalizedBatch?.state === "results" &&
+            Array.isArray(normalizedBatch.results) &&
+            normalizedBatch.results.length >= 1 &&
+            normalizedBatch.results.length <= 10 &&
+            Number.isInteger(normalizedBatch.current_batch_offset) &&
+            normalizedBatch.current_batch_offset >= 0 &&
+            normalizedBatch.results.every(item =>
+              item?.entity_type === "project" &&
+              /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(item.slug) &&
+              item.canonical_url === "/en/projects/" + item.slug + "/"
+            ) &&
+            new Set(normalizedBatch.results.map(item => item.slug)).size ===
+              normalizedBatch.results.length
+          ) {
+            // Re-display the last batch from the existing bounded results.
+            // No catalog query, relaxed filter, entity lookup or new ranking.
+            const batchOffset = Math.max(0,
+              Math.min(normalizedBatch.current_batch_offset - 3,
+                Math.max(0, normalizedBatch.results.length - 3)));
+            const replay = buildSearchRouteResponse({route:"property_search",
+              context:{search:{...normalizedBatch,
+                current_batch_offset:batchOffset}}});
+            if (replay?.response_type === "search_results" &&
+                Array.isArray(replay.cards) && replay.cards.length > 0) {
+              verifiedBatch = replay;
+            }
+          }
           if (verifiedBatch) {
             if (d0Trace) {
               d0Trace.executor = "verified_pagination";
               d0Emit("tool_request");
             }
-            return deliverVerifiedPaginationD2(verifiedBatch, true);
+            return deliverVerifiedPaginationD2(verifiedBatch, true, nextAction.action);
           }
-          // No verified batch: never silently create a new catalog query.
-          // The existing local-answer stage returns a truthful explanation.
+          // Without a valid batch never silently start another catalog search.
+        }
+        if (nextAction?.action === "MEMORY_RECALL") {
+          // State/memory were loaded after conversation authorization. This is
+          // not Registry reference resolution; keep external actions disabled.
+          interpreterClarification = null;
         }
 
         if (d0Trace) d0Trace.executor_route = d0Enum(route, d0Routes);
@@ -5570,8 +5627,9 @@ interpreterClarification =
               : null;
 
         const localAnswer =
-          nextAction?.action === "PAGE_MORE"
-            ? "I can't continue that previous result batch here. Please use Show 3 more on the existing results, or ask me to run a new search."
+          nextAction?.action === "MEMORY_RECALL" ? null :
+          ["PAGE_MORE", "RESUME_SEARCH"].includes(nextAction?.action)
+            ? "I can't access a valid previous result batch in this conversation. We can start a new search if you'd like."
             : (personaA1?.decision === "answer" ||
           (personaA1?.decision === "route" &&
             personaA1?.interpretation?.turn_kind === "profile_update"))
@@ -5615,6 +5673,7 @@ interpreterClarification =
               );
 
         const structuredAnswer =
+          nextAction?.action !== "MEMORY_RECALL" &&
           !f213Recommendation && canUseTool(
             route,
             "structured_lookup"
@@ -5631,6 +5690,7 @@ interpreterClarification =
             : null;
 
         const verifiedProjectOverview =
+          nextAction?.action !== "MEMORY_RECALL" &&
           !localAnswer && !structuredAnswer
             ? buildVerifiedProjectOverview({
                 message,
@@ -5666,7 +5726,7 @@ interpreterClarification =
         // exact facts and deterministic answers retain precedence.
         const d1ConversationalAction =
           turn?.phase === "initial" &&
-          ["ADVISORY", "CLARIFY", "KNOWLEDGE_QA"].includes(nextAction?.action) &&
+          ["ADVISORY", "CLARIFY", "KNOWLEDGE_QA", "MEMORY_RECALL"].includes(nextAction?.action) &&
           ["recommendation", "follow_up", "persona_question", "page_question", "market_question"].includes(route) &&
           !interpreterClarification && !entityResolution?.status?.match?.(/^(?:ambiguous|not_found)$/);
         const useOpenAI =
