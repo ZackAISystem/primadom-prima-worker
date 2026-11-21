@@ -1877,7 +1877,7 @@ export default {
             turn
           })
         : null;
-      if (paginationFast) {
+      const deliverVerifiedPaginationD2 = async (paginationFast, semantic = false) => {
         const startedAt = Date.now();
         const ordering = buildConversationOrderingV1({conversationId, turn});
         // Require monotonic turn ordering: no optimistic reply on an
@@ -1920,7 +1920,8 @@ export default {
           ...response.meta,used_database:true,used_search:true,
           used_openai:false,used_interpreter:false,used_final_openai:false,
           total_openai_tokens:0,openai_calls_attempted:0,
-          next_action:"SEARCH",next_action_reason:"verified_pagination_fastpath",
+          next_action:semantic ? "PAGE_MORE" : "SEARCH",
+          next_action_reason:semantic ? "luna_verified_pagination_v12" : "verified_pagination_fastpath",
           worker_total_ms:Date.now()-startedAt
         };
         await supabaseInsertIdempotentMessage(env,"messages",{
@@ -1931,8 +1932,8 @@ export default {
             used_openai:false,restore_project_cards_v2:primaRestoreProjectCardsV2(response.cards)}
         },"message_id");
         return json(response);
-      }
-
+      };
+      if (paginationFast) return deliverVerifiedPaginationD2(paginationFast);
       try {
         const workerTurnStartedAt = Date.now();
         const p003 = {
@@ -1969,7 +1970,7 @@ export default {
           "follow_up","compare","exact_fact","page_question","market_question",
           "contact_intent","unsupported"];
         const d0Actions = ["SEARCH","ADVISORY","CLARIFY","PERSONA",
-          "PROFILE_UPDATE","CONTACT","REFERENCE","COMPARE","EXACT_FACT",
+          "PROFILE_UPDATE","CONTACT","REFERENCE","COMPARE","EXACT_FACT","PAGE_MORE",
           "KNOWLEDGE_QA","OFF_TOPIC"];
         const d0Emit = stage => {
           if (d0Trace) console.info("PRIMA_V12_TURN_TRACE", JSON.stringify({...d0Trace,stage}));
@@ -4279,6 +4280,30 @@ export default {
             nextAction,
             route
           );
+        // D2: A verified semantic request to continue the current project
+        // batch uses exactly the same guarded paginator as the existing UI
+        // button. Never reinterpret the request as a fresh catalog search.
+        // The validator checks the supplied SearchContextV1 and monotonic
+        // turn ordering before any persisted state/message write.
+        if (nextAction?.action === "PAGE_MORE" && turn?.phase === "initial") {
+          const existingBatch = body?.search_context;
+          const verifiedBatch = prepareFastProjectPaginationV1({
+            message: "Show 3 more", // canonical command for existing paginator
+            context: normalizeSearchContextV1(existingBatch),
+            original: existingBatch,
+            turn
+          });
+          if (verifiedBatch) {
+            if (d0Trace) {
+              d0Trace.executor = "verified_pagination";
+              d0Emit("tool_request");
+            }
+            return deliverVerifiedPaginationD2(verifiedBatch, true);
+          }
+          // No verified batch: never silently create a new catalog query.
+          // The existing local-answer stage returns a truthful explanation.
+        }
+
         if (d0Trace) d0Trace.executor_route = d0Enum(route, d0Routes);
 
         /*
@@ -5545,7 +5570,9 @@ interpreterClarification =
               : null;
 
         const localAnswer =
-          (personaA1?.decision === "answer" ||
+          nextAction?.action === "PAGE_MORE"
+            ? "I can't continue that previous result batch here. Please use Show 3 more on the existing results, or ask me to run a new search."
+            : (personaA1?.decision === "answer" ||
           (personaA1?.decision === "route" &&
             personaA1?.interpretation?.turn_kind === "profile_update"))
             ? personaA1.answer :

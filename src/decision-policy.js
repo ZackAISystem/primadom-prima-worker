@@ -3,6 +3,7 @@ export const NEXT_ACTIONS_V1 =
     EXACT_FACT: "EXACT_FACT",
     KNOWLEDGE_QA: "KNOWLEDGE_QA",
     SEARCH: "SEARCH",
+    PAGE_MORE: "PAGE_MORE",
     COMPARE: "COMPARE",
     ADVISORY: "ADVISORY",
     PROFILE_UPDATE: "PROFILE_UPDATE",
@@ -28,14 +29,14 @@ export function decideNextActionV1({
   // This does not grant the model authority over Contact, Registry identity,
   // consent, verified facts, or any executor. Those stay in the Worker.
   const routeActions={
-    property_search:new Set(["SEARCH","CLARIFY"]),
-    recommendation:new Set(["ADVISORY","SEARCH","CLARIFY"]),
+    property_search:new Set(["SEARCH","CLARIFY","PAGE_MORE"]),
+    recommendation:new Set(["ADVISORY","SEARCH","CLARIFY","PAGE_MORE"]),
     compare:new Set(["COMPARE","CLARIFY"]),
     exact_fact:new Set(["EXACT_FACT","KNOWLEDGE_QA","CLARIFY"]),
     page_question:new Set(["KNOWLEDGE_QA","CLARIFY"]),
     market_question:new Set(["KNOWLEDGE_QA","CLARIFY"]),
     persona_question:new Set(["PERSONA","CLARIFY"]),
-    follow_up:new Set(["ADVISORY","CLARIFY"]),
+    follow_up:new Set(["ADVISORY","CLARIFY","PAGE_MORE"]),
     unsupported:new Set(["CLARIFY"])
   };
   const authoritativeInterpretation=lunaInterpretation || interpretation;
@@ -234,6 +235,11 @@ export function routeForNextActionV1(
 
     case NEXT_ACTIONS_V1.SEARCH:
       return "property_search";
+
+    case NEXT_ACTIONS_V1.PAGE_MORE:
+      // Pagination is executed through the verified SearchContext batch.
+      // Without it the worker must not create a new catalog query.
+      return "follow_up";
 
     case NEXT_ACTIONS_V1.COMPARE:
       return "compare";
