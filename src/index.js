@@ -107,7 +107,8 @@ import {
 import { buildEvidencePack } from "./evidence-pack.js";
 import {
   shouldUseOpenAI,
-  generatePrimaAnswer
+  generatePrimaAnswer,
+  buildLunaAnswerContextV12
 } from "./openai-reasoning.js";
 import { buildStructuredAnswer } from "./structured-answer.js";
 import { buildGroundedFallback, buildVerifiedProjectOverview } from "./grounded-fallback.js";
@@ -5633,6 +5634,14 @@ interpreterClarification =
             fact?.fact_value?.status === "cta_offered"
           );
 
+        // D1: Luna can finish an authorized advisory/clarification turn even
+        // with zero market evidence. Existing Search/Contact/Funnel results,
+        // exact facts and deterministic answers retain precedence.
+        const d1ConversationalAction =
+          turn?.phase === "initial" &&
+          ["ADVISORY", "CLARIFY", "KNOWLEDGE_QA"].includes(nextAction?.action) &&
+          ["recommendation", "follow_up", "persona_question", "page_question", "market_question"].includes(route) &&
+          !interpreterClarification && !entityResolution?.status?.match?.(/^(?:ambiguous|not_found)$/);
         const useOpenAI =
           !contactDecision
             .answer_override &&
@@ -5644,7 +5653,7 @@ interpreterClarification =
           (
             nextAction?.action ===
               "PROFILE_UPDATE" ||
-            (f213Recommendation || shouldUseOpenAI({
+            (d1ConversationalAction || f213Recommendation || shouldUseOpenAI({
               route,
               evidencePack,
               knowledgePack
@@ -5660,6 +5669,7 @@ interpreterClarification =
                     nextAction?.action ||
                     null,
                   evidencePack,
+                  dialogueContext: buildLunaAnswerContextV12(answerContextEnvelope, activeMemory),
                   commercialDirective:
                     g43ApprovedOffer
                       ? {
@@ -5680,7 +5690,7 @@ interpreterClarification =
                       : null,
 
                 deadlineMs:
-                  5000
+                  12000
               })
             : null;
 
