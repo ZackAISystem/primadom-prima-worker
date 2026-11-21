@@ -1943,7 +1943,7 @@ export default {
         // P0-01: a completed, same-message project Search tool result is
         // evidence of an already chosen action, not a new question to route.
         // Do not confuse it with F1 recommendation or a stale search context.
-        const completedProjectSearchContinuationV1 =
+        let completedProjectSearchContinuationV1 =
           turn?.phase === "tool_continuation" &&
           body?.search_context?.version === "SearchContextV1" &&
           body.search_context.language === "en" &&
@@ -2450,6 +2450,24 @@ export default {
           // exact initial model decision from the server-owned pending state;
           // no second Luna call and no untrusted client-supplied state delta.
           const pendingV12=contextEnvelope?.conversation?.dialogue_state?.pending_semantic_v12;
+          // The existing Search frontend may return a normalized query rather
+          // than the user's original sentence. The ONLY alternative match is
+          // a query checkpointed in the server-owned conversation row for this
+          // exact turn. Never accept arbitrary client-provided search results.
+          if(turn?.phase==="tool_continuation" &&
+              pendingV12?.turn_id===turn.turn_id &&
+              pendingV12?.turn_seq===turn.turn_seq &&
+              typeof pendingV12.search_query==="string" &&
+              pendingV12.search_query.length>0 &&
+              body?.search_context?.query===pendingV12.search_query &&
+              body?.search_context?.version==="SearchContextV1" &&
+              body?.search_context?.language==="en" &&
+              body?.search_context?.entity_type==="project" &&
+              ["results","empty"].includes(body.search_context.state) &&
+              Array.isArray(body.search_context.results) &&
+              Boolean(normalizeSearchContextV1(body.search_context))) {
+            completedProjectSearchContinuationV1=true;
+          }
           if(turn?.phase==="tool_continuation" && pendingV12?.turn_id===turn.turn_id &&
               pendingV12?.turn_seq===turn.turn_seq) {
             contextEnvelope.luna_decision_v12={
@@ -4655,9 +4673,16 @@ interpreterClarification =
           request; only that completed pass continues
           into answer generation + persistence.
         */
+        // A validated Luna ADVISORY is not permission to launch Search.
+        // Keep the existing legacy recommendation-search path only when Luna
+        // did not make an authoritative semantic action choice.
+        const lunaOwnsAdvisoryV12 =
+          nextAction?.reason==="luna_validated_semantic_action_v12" &&
+          nextAction?.action==="ADVISORY";
         const searchDispatchAllowed =
           nextAction?.action === "SEARCH" ||
           (
+            !lunaOwnsAdvisoryV12 &&
             nextAction?.action === "ADVISORY" &&
             route === "recommendation"
           );
@@ -4997,6 +5022,9 @@ interpreterClarification =
             });
             previewState.pending_semantic_v12={
               turn_id:turn.turn_id,turn_seq:turn.turn_seq,
+              // Bind the exact outbound Search request to this server turn;
+              // never trust a query echoed by an unrelated frontend request.
+              search_query:primaSearchRequest.query,
               conversation_move:contextEnvelope?.luna_decision_v12?.conversation_move===
                 "refinement" ? "refinement" : null,
               changes:pendingChanges

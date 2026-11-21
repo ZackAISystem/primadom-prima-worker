@@ -598,6 +598,47 @@ function personalizedRecommendationV1({message = "", context = null} = {}) {
 }
 
 
+
+// V1.2 S3.2: project the ALREADY VALIDATED Luna refinement into the existing
+// text-based PrimaToolRequestV1 interface. This is an adapter, not another
+// semantic parser or a second store of buyer preferences. Search V3 retains
+// exclusive authority for parsing, matching, ranking and result validation.
+// Do not borrow old slots for new searches or model-generated entity lookups.
+function validatedLunaRefinementQueryV12({route, context, explicitReset}) {
+  const decision=context?.luna_decision_v12;
+  const saved=context?.conversation?.dialogue_state;
+  const request=context?.state?.request_state;
+  if(route!=="property_search" || explicitReset ||
+     decision?.next_action!=="SEARCH" ||
+     decision?.conversation_move!=="refinement" ||
+     !Array.isArray(decision?.changes) || !decision.changes.length ||
+     !["property_search","recommendation"].includes(saved?.active_thread?.active_topic) ||
+     !request || typeof request!=="object") return null;
+  // A new named commercial entity is not a refinement of property filters.
+  if((context?.request_interpretation?.entities || []).some(entity =>
+      ["project","developer"].includes(entity?.type) && entity?.name)) return null;
+  const parts=["Find"];
+  const types={apartment:"apartments",villa:"villas",townhouse:"townhouses",
+    penthouse:"penthouses",duplex:"duplexes",studio:"studios",plot:"plots"};
+  const type=types[String(request.property_type || "").toLowerCase()];
+  parts.push(type || "properties");
+  const beds=Number(request.bedrooms);
+  if(request.bedrooms!==null && request.bedrooms!==undefined &&
+     Number.isInteger(beds) && beds>=0 && beds<=20) parts.push(`with ${beds} bedrooms`);
+  const location=normalizePreferredLocationTextV1(request.location);
+  if(location) parts.push(`in ${location}`);
+  const minimum=Number(request?.budget?.min_aed);
+  const maximum=Number(request?.budget?.max_aed);
+  if(request?.budget?.min_aed!=null && Number.isSafeInteger(minimum) && minimum>0)
+    parts.push(`above AED ${minimum}`);
+  if(request?.budget?.max_aed!=null && Number.isSafeInteger(maximum) && maximum>0)
+    parts.push(`under AED ${maximum}`);
+  if(request.goal==="investment") parts.push("for investment");
+  // A generic empty search must not silently replace the original request.
+  if(parts.length<=2 && !type) return null;
+  return parts.join(" ");
+}
+
 export function buildPrimaSearchRequest({
   route = null,
   message = "",
@@ -676,8 +717,15 @@ export function buildPrimaSearchRequest({
   const personalized = recommendationSearch
     ? personalizedRecommendationV1({message, context})
     : null;
+  // Semantic refinement takes precedence over the legacy wording-based
+  // continuation detector. Its typed slots were already checked and applied
+  // by ConversationStateV1; never append an obsolete prior property type.
+  const lunaRefinementQuery=validatedLunaRefinementQueryV12({
+    route,context,explicitReset
+  });
   const query =
     personalized?.query ||
+    lunaRefinementQuery ||
     exactMaxRefinement ||
     (continuingPreviousSearch
       ? augmentSearchQueryWithMemory({query: contextualQuery, context:continuationContext})
