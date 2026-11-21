@@ -18,8 +18,36 @@ export function decideNextActionV1({
   route,
   conversationMove = null,
   interpretation = null,
-  clarification = null
+  clarification = null,
+  lunaDecision = null
 } = {}) {
+  const planned=lunaDecision?.next_action;
+  // The model proposes intent/action; the Worker validates the combination.
+  // Never authorize Contact or an unverified Reference through the model.
+  const routeActions={
+    property_search:new Set(["SEARCH","CLARIFY"]),
+    recommendation:new Set(["ADVISORY","SEARCH","CLARIFY"]),
+    compare:new Set(["COMPARE","CLARIFY"]),
+    exact_fact:new Set(["EXACT_FACT","KNOWLEDGE_QA","CLARIFY"]),
+    page_question:new Set(["KNOWLEDGE_QA","CLARIFY"]),
+    market_question:new Set(["KNOWLEDGE_QA","CLARIFY"]),
+    persona_question:new Set(["PERSONA","CLARIFY"]),
+    follow_up:new Set(["ADVISORY","CLARIFY"]),
+    unsupported:new Set(["CLARIFY"])
+  };
+  const matchesRoute=interpretation?.primary_route===route;
+  const isPureProfile=planned==="PROFILE_UPDATE" &&
+    interpretation?.turn_kind==="profile_update" &&
+    Array.isArray(interpretation?.tasks) && interpretation.tasks.length===0 &&
+    (Array.isArray(interpretation?.memory_candidates) &&
+      interpretation.memory_candidates.length>0 ||
+     Array.isArray(lunaDecision?.changes) && lunaDecision.changes.length>0);
+  if(Number(lunaDecision?.confidence)>=0.70 &&
+     route!=="contact_intent" && matchesRoute &&
+     (routeActions[route]?.has(planned) || isPureProfile)) {
+    return {version:"DecisionPolicyV1",action:planned,
+      reason:"luna_validated_route_action_v12"};
+  }
   if (route === "persona_question") {
     return {
       version: "DecisionPolicyV1",
@@ -130,8 +158,8 @@ export function decideNextActionV1({
     case "unsupported":
       return {
         version: "DecisionPolicyV1",
-        action: NEXT_ACTIONS_V1.OFF_TOPIC,
-        reason: "unsupported_route"
+        action: NEXT_ACTIONS_V1.CLARIFY,
+        reason: "semantic_request_unresolved"
       };
 
     case "page_question":

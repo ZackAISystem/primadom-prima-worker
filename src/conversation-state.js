@@ -1,6 +1,152 @@
 import { normalizePreferredLocationTextV1 } from "./preferred-location-v1.js";
 import { extractProjectComparisonTarget } from "./compare.js";
 
+
+// V1.2: a single, evidence-bound delta applied to the existing request_state.
+// No raw model output is directly trusted or written to Supabase.
+const LUNA_SLOTS_V12 = new Set([
+  "property_type", "location", "budget_min_aed", "budget_max_aed",
+  "bedrooms", "goal", "timeline"
+]);
+const LUNA_MEMORY_KEYS_V12 = {
+  property_type:"property_type", location:"preferred_location_text",
+  budget_min_aed:"budget_min_aed", budget_max_aed:"budget_max_aed",
+  bedrooms:"bedrooms", goal:"buyer_goal", timeline:"timeline"
+};
+const LUNA_MOVES_V12 = new Set([
+  "new_thread", "continuation", "refinement", "temporary_tangent", "resume", "reference"
+]);
+const LUNA_ACTIONS_V12 = new Set([
+  "PERSONA", "ADVISORY", "SEARCH", "EXACT_FACT", "KNOWLEDGE_QA",
+  "COMPARE", "CLARIFY", "CONTACT", "PROFILE_UPDATE", "REFERENCE"
+]);
+
+function normalizeLunaSlotV12(field, raw) {
+  const value=typeof raw==="string" ? raw.trim() : "";
+  if(!value || value.length>120 || /[<>\r\n]/.test(value)) return null;
+  if(field==="property_type") {
+    const type=value.toLowerCase();
+    return ["apartment","villa","townhouse","penthouse","duplex","studio","plot"]
+      .includes(type) ? type : null;
+  }
+  if(field==="location") return normalizePreferredLocationTextV1(value);
+  if(field==="budget_min_aed" || field==="budget_max_aed") {
+    const n=Number(value.replace(/,/g,""));
+    return Number.isSafeInteger(n) && n>=10_000 && n<=10_000_000_000 ? n : null;
+  }
+  if(field==="bedrooms") {
+    const n=Number(value);
+    return Number.isInteger(n) && n>=0 && n<=20 ? n : null;
+  }
+  return value;
+}
+
+// Pending changes are written only into the existing authorized conversation
+// row before the frontend completes the existing two-pass Search contract.
+// No model output or user message is copied into this pending control record.
+export function lunaMemoryFactsFromStateChangesV12(changes) {
+  return (Array.isArray(changes) ? changes : []).slice(0,7)
+    .filter(item=>LUNA_SLOTS_V12.has(item?.field) && item.operation==="set" &&
+      normalizeLunaSlotV12(item.field,String(item?.value ?? ""))!==null)
+    .map(item=>({fact_key:LUNA_MEMORY_KEYS_V12[item.field],
+      fact_value:normalizeLunaSlotV12(item.field,String(item.value)),
+      confidence:0.91,source:"luna_explicit_evidence_v12"}));
+}
+
+// A durable cancellation masks an older active Memory value without deleting
+// canonical Memory rows. The mask lives only in the existing ConversationStateV1.
+export function maskClearedConversationMemoryV12(facts, context, currentChanges=[]) {
+  const request=context?.conversation?.dialogue_state?.request_state || {};
+  const blocked=new Set(Array.isArray(request.cleared_fields_v12) ? request.cleared_fields_v12 : []);
+  for(const item of (Array.isArray(currentChanges)?currentChanges:[])) {
+    if(item?.operation==="clear") blocked.add(item.field);
+    if(item?.operation==="set") blocked.delete(item.field);
+  }
+  const keys={property_type:"property_type",location:"preferred_location_text",
+    budget_min_aed:"budget_min_aed",budget_max_aed:"budget_max_aed",
+    bedrooms:"bedrooms",goal:"buyer_goal",timeline:"timeline"};
+  const memoryBlocked=new Set([...blocked].map(field=>keys[field]).filter(Boolean));
+  return (Array.isArray(facts)?facts:[]).filter(f=>!memoryBlocked.has(f?.fact_key));
+}
+
+export function applyLunaDecisionToContextV12(context, message, decision) {
+  if(!context || !decision || typeof decision!=="object") return null;
+  const input=String(message || "").normalize("NFKC").toLowerCase();
+  const result=[];
+  const seen=new Set();
+  for(const item of (Array.isArray(decision.state_changes) ? decision.state_changes : []).slice(0,7)) {
+    const field=String(item?.field || "");
+    const operation=item?.operation;
+    const evidence=String(item?.evidence || "").trim();
+    const confidence=Number(item?.confidence);
+    if(!LUNA_SLOTS_V12.has(field) || seen.has(field) ||
+       !["set","clear"].includes(operation) ||
+       !Number.isFinite(confidence) || confidence < (operation==="clear" ? 0.9 : 0.8) ||
+       evidence.length<2 || evidence.length>200 ||
+       !input.includes(evidence.normalize("NFKC").toLowerCase())) continue;
+    const value=operation==="clear" ? null : normalizeLunaSlotV12(field,item?.value);
+    if(operation==="set" && value===null) continue;
+    seen.add(field);
+    result.push({field,operation,value});
+  }
+  const confidence=Number(decision.confidence);
+  const authorized=Number.isFinite(confidence) && confidence>=0.70;
+  if(!authorized) result.length=0;
+  context.luna_decision_v12={
+    changes:result,
+    conversation_move:authorized && LUNA_MOVES_V12.has(decision.conversation_move)
+      ? decision.conversation_move : null,
+    next_action:authorized && LUNA_ACTIONS_V12.has(decision.next_action)
+      ? decision.next_action : null,
+    confidence:Number.isFinite(confidence)?confidence:0
+  };
+  refreshConversationStateV1(context);
+  return {
+    changes:result,
+    memory_facts:lunaMemoryFactsFromStateChangesV12(result)
+  };
+}
+
+function applyLunaSlotsToStateV12(state,context,{verifiedSearch=false}={}) {
+  const request=state.request_state;
+  const prior=context?.conversation?.dialogue_state?.request_state || {};
+  const decision=context?.luna_decision_v12;
+  const previousTopic=context?.conversation?.dialogue_state?.active_thread?.active_topic;
+  const refine=decision?.conversation_move==="refinement" &&
+    ["property_search","recommendation"].includes(previousTopic);
+  if(refine) {
+    // In a refinement, SearchContext may omit unchanged filters. The client's
+    // earlier requirements remain canonical, never replaced with null.
+    request.property_type=prior.property_type ?? null;
+    request.location=prior.location ?? null;
+    request.budget={min_aed:prior.budget?.min_aed ?? null,
+      max_aed:prior.budget?.max_aed ?? null};
+    request.bedrooms=prior.bedrooms ?? null;
+    request.goal=prior.goal ?? null;
+    request.timeline=prior.timeline ?? null;
+  }
+  // Explicit cancellations are durable even when old Memory is active or
+  // the two-pass Search returns filters containing an outdated value.
+  const cleared=new Set(
+    (Array.isArray(prior.cleared_fields_v12) ? prior.cleared_fields_v12 : [])
+      .filter(field=>LUNA_SLOTS_V12.has(field)));
+  const locate=field=> field==="budget_min_aed" ? [request.budget,"min_aed"] :
+    field==="budget_max_aed" ? [request.budget,"max_aed"] :
+    [request,field];
+  for(const field of cleared) {
+    const [obj,key]=locate(field);
+    obj[key]=null;
+  }
+  for(const change of (context?.luna_decision_v12?.changes || [])) {
+    const [obj,key]=locate(change.field);
+    obj[key]=change.operation==="clear" ? null : change.value;
+    if(change.operation==="clear") cleared.add(change.field);
+    else cleared.delete(change.field);
+  }
+  request.cleared_fields_v12=[...cleared];
+  return state;
+}
+
 const ROUTE_GOALS = Object.freeze({
   property_search: "find_property",
   recommendation: "choose_option",
@@ -46,16 +192,18 @@ function activeFacts(context = {}) {
 }
 
 
-function memoryValue(
-  context,
-  key
-) {
-  return activeFacts(context)
-    .find(
-      item =>
-        item?.fact_key === key
-    )
-    ?.fact_value ?? null;
+function memoryValue(context, key) {
+  const slot={preferred_location_text:"location", buyer_goal:"goal",
+    property_type:"property_type",budget_min_aed:"budget_min_aed",
+    budget_max_aed:"budget_max_aed",bedrooms:"bedrooms", timeline:"timeline"}[key];
+  const cleared=persistedState(context)?.request_state?.cleared_fields_v12;
+  if(slot && Array.isArray(cleared) && cleared.includes(slot)) return null;
+  // Latest verified Memory fact wins; never resurrect an older value.
+  const facts=activeFacts(context);
+  for(let i=facts.length-1;i>=0;i--){
+    if(facts[i]?.fact_key===key) return facts[i].fact_value ?? null;
+  }
+  return null;
 }
 
 
@@ -478,9 +626,9 @@ export function buildConversationStateV1(
     context?.search?.version === "SearchContextV1" &&
     context?.search?.language === "en" &&
     context?.search?.entity_type === "project" &&
-    context?.search?.state === "results" &&
+    ["results","empty"].includes(context?.search?.state) &&
     Array.isArray(context.search.results) &&
-    context.search.results.length > 0;
+    Boolean(context.search.filters);
 
   const buyerGoal =
     memoryValue(
@@ -641,7 +789,7 @@ export function buildConversationStateV1(
               null
             );
 
-  return {
+  const nextState = {
     version:
       "ConversationStateV1",
 
@@ -770,6 +918,7 @@ export function buildConversationStateV1(
         null
     }
   };
+  return applyLunaSlotsToStateV12(nextState,context,{verifiedSearch:verifiedProjectSearch});
 }
 
 

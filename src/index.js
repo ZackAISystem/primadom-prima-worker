@@ -70,7 +70,10 @@ import {
 } from "./context.js";
 import {
   refreshConversationStateV1,
-  applyConversationMoveToStateV1
+  applyConversationMoveToStateV1,
+  applyLunaDecisionToContextV12,
+  lunaMemoryFactsFromStateChangesV12,
+  maskClearedConversationMemoryV12
 } from "./conversation-state.js";
 import {
   recognizeConversationMove
@@ -1975,6 +1978,68 @@ export default {
             confidence:0.98,source:"h29_explicit_self_introduction"});
         }
 
+        // V1.2 ALWAYS-ON UNDERSTANDING: one semantic read for every initial
+        // human turn after conversation authorization. It does not authorize
+        // contact, bypass factual validation, or replace legacy final answers.
+        // Reuse the authorized memory/context later instead of reading twice.
+        const lunaHumanTurnV12 = personaA1Eligible({turn, message});
+        let lunaUnderstandingV12 = null;
+        let lunaContextV12 = null;
+        let lunaContextLoadedV12 = false;
+        let lunaStoredMemoryV12 = null;
+        let lunaStateChangesV12 = null;
+        if (lunaHumanTurnV12) {
+          const [memoryLoad, contextLoad] = await Promise.allSettled([
+            loadActiveMemory(env, conversationId),
+            buildContextEnvelope(env, body, message, [])
+          ]);
+          lunaStoredMemoryV12 = memoryLoad.status === "fulfilled" &&
+            Array.isArray(memoryLoad.value) ? memoryLoad.value : [];
+          lunaContextLoadedV12 = contextLoad.status === "fulfilled" &&
+            Boolean(contextLoad.value);
+          lunaContextV12 = lunaContextLoadedV12
+            ? contextLoad.value
+            : buildLocalContextEnvelope(body, message, []);
+          lunaStoredMemoryV12=maskClearedConversationMemoryV12(
+            lunaStoredMemoryV12,lunaContextV12
+          );
+          const semanticMemory = mergeCurrentTurnMemory(
+            lunaStoredMemoryV12, extractedFacts
+          );
+          lunaContextV12.memory ??= {active_facts: []};
+          lunaContextV12.memory.active_facts = semanticMemory;
+          refreshConversationStateV1(lunaContextV12);
+          const semanticRoute = h29Direct.direct_request
+            ? "contact_intent" : routeIntent(message, lunaContextV12);
+          a1StartedAt = Date.now();
+          lunaUnderstandingV12 = await personaA1Generate({
+            env, message, context: lunaContextV12,
+            memory: semanticMemory, route: semanticRoute,
+            dialogueMode: isComplexFirstTurnDialogue({message, turn}) &&
+              !h29Direct.direct_request
+          });
+          a1FinishedAt = Date.now();
+          const lunaPlanV12 = lunaUnderstandingV12?.interpretation?.luna_decision ||
+            lunaUnderstandingV12?.luna_decision || null;
+          lunaStateChangesV12=applyLunaDecisionToContextV12(
+            lunaContextV12, message, lunaPlanV12
+          );
+          if(lunaStateChangesV12?.changes?.length) {
+            // Explicit cancellation must not be resurrected from older regex
+            // facts, canonical Memory, or a previous Search projection.
+            extractedFacts=maskClearedConversationMemoryV12(
+              extractedFacts,lunaContextV12,lunaStateChangesV12.changes
+            );
+            lunaStoredMemoryV12=maskClearedConversationMemoryV12(
+              lunaStoredMemoryV12,lunaContextV12,lunaStateChangesV12.changes
+            );
+            const newFacts=lunaStateChangesV12.memory_facts || [];
+            const changed=new Set(newFacts.map(f=>f.fact_key));
+            extractedFacts=[...extractedFacts.filter(f=>!changed.has(f?.fact_key)),
+              ...newFacts];
+          }
+        }
+
         // MEM11: single explicit project decisions are not Search or Persona.
         // Only verified project context can authorize the local Memory write.
         // No OpenAI, no search, no contact/lead action.
@@ -1998,7 +2063,7 @@ export default {
               message, body?.page?.language_code || "en"
             )
           : null;
-        if (mem07Profile) {
+        if (mem07Profile && !(lunaStateChangesV12?.changes?.length)) {
           const mem07Response = await persistDeterministicProfileTurnV1({
             env, conversationId, body, message,
             facts: mem07Profile.facts
@@ -2013,11 +2078,15 @@ export default {
           );
 
         let contextEnvelope =
-          buildLocalContextEnvelope(
+          lunaContextV12 || buildLocalContextEnvelope(
             body,
             message,
             activeMemory
           );
+        if(lunaContextV12?.luna_decision_v12) {
+          contextEnvelope.luna_decision_v12=lunaContextV12.luna_decision_v12;
+        }
+        contextEnvelope.memory.active_facts=activeMemory;
 
         refreshConversationStateV1(
           contextEnvelope
@@ -2099,6 +2168,7 @@ export default {
           });
 
         const baseFastPath =
+          !lunaHumanTurnV12 &&
           !blockAEarlyMixedIntent &&
           !contextualNameCandidate &&
             !explicitNameOnlyMessage &&
@@ -2194,21 +2264,16 @@ export default {
           i33Mark("context_load_start");
           const p003ContextStart = Date.now();
           const [
-            memoryBeforeTurn,
+            rawMemoryBeforeTurn,
             fullContextEnvelope
-          ] = await Promise.all([
-            loadActiveMemory(
-              env,
-              conversationId
-            ),
-
-            buildContextEnvelope(
-              env,
-              body,
-              message,
-              []
-            )
-          ]);
+          ] = lunaContextLoadedV12 ? [lunaStoredMemoryV12, lunaContextV12]
+            : await Promise.all([
+                loadActiveMemory(env, conversationId),
+                buildContextEnvelope(env, body, message, [])
+              ]);
+          const memoryBeforeTurn=maskClearedConversationMemoryV12(
+            rawMemoryBeforeTurn,fullContextEnvelope
+          );
           i33Mark("context_load_end");
           p003.context_load_ms = Date.now() - p003ContextStart;
 
@@ -2376,6 +2441,34 @@ export default {
 
           contextEnvelope =
             fullContextEnvelope;
+          // Tool continuation is not a second user question. Recover the
+          // exact initial model decision from the server-owned pending state;
+          // no second Luna call and no untrusted client-supplied state delta.
+          const pendingV12=contextEnvelope?.conversation?.dialogue_state?.pending_semantic_v12;
+          if(turn?.phase==="tool_continuation" && pendingV12?.turn_id===turn.turn_id &&
+              pendingV12?.turn_seq===turn.turn_seq) {
+            contextEnvelope.luna_decision_v12={
+              changes:Array.isArray(pendingV12.changes)?pendingV12.changes:[],
+              conversation_move:pendingV12.conversation_move==="refinement"
+                ? "refinement" : null,
+              next_action:null,confidence:1
+            };
+            const pendingFacts=lunaMemoryFactsFromStateChangesV12(pendingV12.changes);
+            // Pending CLEAR has no Memory insert; mask it for the finishing turn.
+            const withoutCleared=maskClearedConversationMemoryV12(
+              extractedFacts,contextEnvelope,pendingV12.changes
+            );
+            extractedFacts=withoutCleared;
+            if(pendingFacts.length) {
+              const overridden=new Set(pendingFacts.map(f=>f.fact_key));
+              extractedFacts=[...extractedFacts.filter(f=>!overridden.has(f?.fact_key)),...pendingFacts];
+              activeMemory=mergeCurrentTurnMemory(memoryBeforeTurn,extractedFacts);
+              contextEnvelope.memory.active_facts=activeMemory;
+            }
+          }
+          if(lunaContextV12?.luna_decision_v12) {
+            contextEnvelope.luna_decision_v12=lunaContextV12.luna_decision_v12;
+          }
 
           refreshConversationStateV1(
             contextEnvelope
@@ -3190,44 +3283,54 @@ export default {
         const deterministicRouteBeforeInterpreter =
           route;
 
-        // Block A: one Luna interpretation + answer for natural, open-ended
-        // first-turn introductions; direct Search/Contact keeps its own route.
+        // V1.2: the authorized Luna understanding has already run, including
+        // greetings and early deterministic Memory/Contact paths. On this
+        // regular path only applicable semantic decisions may override a route;
+        // named-entity resolution and contact consent retain code authority.
         const blockAComplexDialogue = isComplexFirstTurnDialogue({message,turn}) &&
           !h29Direct.direct_request && !i32ExpectedContactOnly;
-
-        // A1: single semantic call for candidate Persona/unsupported messages.
-        // Successful semantic routing never re-enters RequestInterpreter.
-        // Fallback to the legacy Interpreter happens ONLY after a model error.
-        let personaA1 = null;
-        if (
-          env?.PRIMA_PERSONA_GENERATIVE_A1 === "1" &&
-          (blockAComplexDialogue || personaA1Eligible({route,turn,message})) &&
-          (!blockAMixedFirstTurn || blockAComplexDialogue) &&
-          !i32ExpectedContactOnly &&
-          !(route === "unsupported" && classifyClearlyOffTopicRequest(message)) &&
-          (!deterministicEntityReady || blockAComplexDialogue) && !preInterpreterCompareDecision
-        ) {
-          a1StartedAt = Date.now();
-          personaA1 = await personaA1Generate({
-            env,message,context:contextEnvelope,memory:activeMemory,route,
-            dialogueMode:blockAComplexDialogue
-          });
-          a1FinishedAt = Date.now();
-          if (personaA1?.decision === "answer") {
-            route = "persona_question";
-          } else if (personaA1?.decision === "delegate" && blockAComplexDialogue) {
-            // Rare tool-needed first turn: delegate to the original typed
-            // Interpreter, retaining all search filters (no A1 null constraints).
+        // The semantic model is the first-choice decision maker for all
+        // authenticated initial human turns. Proof of entities/consent stays
+        // with Registry and Worker, never with the language model.
+        const lunaMaySteerV12 =
+          lunaHumanTurnV12 && !completedProjectSearchContinuationV1 &&
+          !h29Direct.direct_request && !i32ExpectedContactOnly;
+        // Preserve usage metrics even when the semantic result is advisory only.
+        let personaA1 = lunaMaySteerV12 ? lunaUnderstandingV12 :
+          lunaUnderstandingV12 ? {
+            ...lunaUnderstandingV12,
+            decision: "observe",
+            answer: null,
+            memory_candidates: lunaUnderstandingV12?.interpretation?.memory_candidates ||
+              lunaUnderstandingV12?.memory_candidates || []
+          } : null;
+        let a1NeedsTypedInterpreterV12 = false;
+        if (personaA1?.decision === "answer") {
+          route = "persona_question";
+        } else if (personaA1?.decision === "delegate" && blockAComplexDialogue) {
+          // Search/Knowledge requirements must remain in the typed interpreter.
+          fastGate = {...fastGate, decision:"interpret", use_interpreter:true,
+            reason:"block_a_dialogue_tool_delegation"};
+        } else if (personaA1?.decision === "route") {
+          const nextSemanticRoute = personaA1.interpretation?.primary_route;
+          // The compact A1 schema deliberately does not contain full Search
+          // constraints. Never replace the typed interpreter with null filters.
+          // The V1.2 semantic contract includes typed state deltas and task
+          // facts; the legacy Interpreter is recovery, not a second owner.
+          a1NeedsTypedInterpreterV12 =
+            Number(personaA1.interpretation?.overall_confidence || 0)<0.70;
+          if (a1NeedsTypedInterpreterV12) {
+            route = nextSemanticRoute;
             fastGate = {...fastGate, decision:"interpret",use_interpreter:true,
-              reason:"block_a_dialogue_tool_delegation"};
-          } else if (personaA1?.decision === "route") {
+              reason:"v12_low_confidence_recovery"};
+          } else if (nextSemanticRoute) {
             interpreterResult = {
-              interpretation:personaA1.interpretation,
-              // Tokens accounted against personaA1 exactly ONCE below.
+              interpretation: personaA1.interpretation,
+              // Usage is charged to Luna exactly once, not the Interpreter.
               meta:{used_openai:false,latency_ms:0,input_tokens:0,
                 output_tokens:0,total_tokens:0}
             };
-            route = personaA1.interpretation.primary_route;
+            route = nextSemanticRoute;
             if (contextEnvelope) {
               contextEnvelope.request_interpretation = personaA1.interpretation;
             }
@@ -3257,9 +3360,13 @@ export default {
 
         if (
           fastGate.use_interpreter &&
-          !["answer","route"].includes(personaA1?.decision) &&
-          // A failed but already attempted A1 request must not trigger a second paid interpreter.
+          (!["answer","route"].includes(personaA1?.decision) ||
+            a1NeedsTypedInterpreterV12) &&
+          // Recover from model errors, and use the typed interpreter when
+          // A1 cannot express search constraints; avoid accidental dead ends.
           (!personaA1?.used ||
+            ["error", "observe"].includes(personaA1?.decision) ||
+            a1NeedsTypedInterpreterV12 ||
             (blockAComplexDialogue && personaA1?.decision === "delegate")) &&
           !(route === "unsupported" && classifyClearlyOffTopicRequest(message)) &&
           !deterministicEntityReady &&
@@ -3638,6 +3745,29 @@ export default {
           };
         }
 
+        // Luna may choose a task transition. A "resume" needs a saved thread;
+        // a reference needs verified identity. Never let model supply proof.
+        const v12Plan=contextEnvelope?.luna_decision_v12 || null;
+        const previousTopic=contextEnvelope?.conversation?.dialogue_state?.active_thread?.active_topic;
+        const proposedMove=v12Plan?.conversation_move;
+        const allowedMove=proposedMove==="refinement"
+          ? ["property_search","recommendation"].includes(previousTopic) &&
+            (v12Plan?.changes?.length>0 || route===previousTopic)
+          : proposedMove==="resume"
+            ? Boolean(contextEnvelope?.conversation?.dialogue_state?.continuity_references?.suspended_thread)
+            : proposedMove==="reference" ? false // Keep verified reducer proof.
+            : proposedMove==="temporary_tangent"
+              ? Boolean(previousTopic)
+              : ["new_thread","continuation"].includes(proposedMove);
+        if(allowedMove && route!=="contact_intent") {
+          const effectiveMove=proposedMove==="new_thread" && previousTopic
+            ? "switch" : proposedMove;
+          conversationMove={...conversationMove,version:"ConversationMoveV1",
+            move_type:effectiveMove,effective_route:route,
+            reason:"luna_structured_decision_v12",confidence:v12Plan.confidence,
+            changed_fields:(v12Plan.changes || []).map(c=>c.field),
+            ...(proposedMove!=="reference" ? {reference:null} : {})};
+        }
         if (personaA1?.decision === "answer") route = "persona_question";
         const retainedDecisionState =
           contextEnvelope
@@ -4056,7 +4186,8 @@ export default {
             interpretation:
               resolvedInterpretation,
             clarification:
-              interpreterClarification
+              interpreterClarification,
+            lunaDecision:contextEnvelope?.luna_decision_v12 || null
           });
 
         route =
@@ -4830,6 +4961,42 @@ interpreterClarification =
           primaSearchRequest &&
           turn?.phase !== "tool_continuation"
         ) {
+          // The frontend completes Search in a second request. Without this
+          // guarded server-owned checkpoint, Luna's initial slot decisions
+          // could disappear before the normal Memory persistence pass.
+          const pendingChanges=contextEnvelope?.luna_decision_v12?.changes || [];
+          let pendingStateSavedV12=null;
+          if(pendingChanges.length && typeof turn?.turn_id==="string" &&
+              Number.isInteger(turn?.turn_seq)) {
+            const expected=contextEnvelope?.conversation?.last_applied_turn_seq;
+            const expectedFilter=Number.isInteger(expected)
+              ? `eq.${expected}` : "is.null";
+            const nextExpected=Number.isInteger(expected) ? expected+1 : 1;
+            if(turn.turn_seq!==nextExpected) {
+              console.warn("prima_v12_pending_state_nonsequential_turn");
+            } else {
+            const previewState=applyConversationMoveToStateV1(contextEnvelope,{
+              route,move:conversationMove,response_type:"tool_request"
+            });
+            previewState.pending_semantic_v12={
+              turn_id:turn.turn_id,turn_seq:turn.turn_seq,
+              conversation_move:contextEnvelope?.luna_decision_v12?.conversation_move===
+                "refinement" ? "refinement" : null,
+              changes:pendingChanges
+            };
+            try {
+              const checkpointRows=await supabaseUpdateReturning(env,"conversations",
+                `conversation_id=eq.${conversationId}&last_applied_turn_seq=${expectedFilter}`,
+                {dialogue_state:previewState});
+              pendingStateSavedV12=Array.isArray(checkpointRows) && checkpointRows.length>0;
+              if(!pendingStateSavedV12) console.warn("prima_v12_pending_state_checkpoint_conflict");
+            } catch {
+              // Search can still proceed; never expose DB details.
+              pendingStateSavedV12=false;
+              console.warn("prima_v12_pending_state_checkpoint_failed");
+            }
+            }
+          }
           return json({
             ...primaSearchRequest,
 
@@ -4854,6 +5021,7 @@ interpreterClarification =
 
               used_search:
                 false,
+              state_checkpoint_saved_v12:pendingStateSavedV12,
               persona_a1_total_tokens: personaA1?.usage?.total_tokens ?? null,
               persona_a1_usage_unknown: Boolean(personaA1?.usage_unknown),
               total_openai_tokens: personaA1?.usage?.total_tokens ?? 0,
@@ -6219,6 +6387,12 @@ response.meta.used_search =
             }
           );
 
+        // A completed two-pass Search consumes the server-owned pending delta.
+        // The final canonical state contains the applied changes, not the checkpoint.
+        if(turn?.phase==="tool_continuation" &&
+           dialogueStateForPersistence.pending_semantic_v12) {
+          delete dialogueStateForPersistence.pending_semantic_v12;
+        }
         // E21: attach only Registry-confirmed identities after C's reducer.
         // This preserves all C fields and never stores Knowledge/page JSON.
         const e21Confirmed = entityResolution?.resolved === true &&
