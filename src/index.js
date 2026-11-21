@@ -1958,6 +1958,21 @@ export default {
         const i33Perf = env?.PRIMA_PERSONA_DIAGNOSTICS === "1" ? {} : null;
         const i33Mark = (key) => { if (i33Perf) i33Perf[key] = Date.now(); };
         i33Mark("worker_start");
+        // D0: opt-in production turn trace. Enum-only, no prompts, facts,
+        // state values, IDs, contact data, evidence or generated text.
+        const d0Trace = env?.PRIMA_TURN_TRACE === "1"
+          ? {version:"PRIMA_V12_D0", phase:turn?.phase === "tool_continuation"
+              ? "tool_continuation" : "initial"} : null;
+        const d0Enum = (value, allowed) => allowed.includes(value) ? value : "other";
+        const d0Routes = ["persona_question","property_search","recommendation",
+          "follow_up","compare","exact_fact","page_question","market_question",
+          "contact_intent","unsupported"];
+        const d0Actions = ["SEARCH","ADVISORY","CLARIFY","PERSONA",
+          "PROFILE_UPDATE","CONTACT","REFERENCE","COMPARE","EXACT_FACT",
+          "KNOWLEDGE_QA","OFF_TOPIC"];
+        const d0Emit = stage => {
+          if (d0Trace) console.info("PRIMA_V12_TURN_TRACE", JSON.stringify({...d0Trace,stage}));
+        };
         let a1StartedAt = null;
         let a1FinishedAt = null;
         let interpreterCallAttempted = false;
@@ -2019,6 +2034,22 @@ export default {
               !h29Direct.direct_request
           });
           a1FinishedAt = Date.now();
+          if (d0Trace) {
+            d0Trace.luna_outcome = d0Enum(lunaUnderstandingV12?.decision,
+              ["answer","delegate","route","error","observe"]);
+            d0Trace.luna_route = d0Enum(
+              lunaUnderstandingV12?.interpretation?.primary_route, d0Routes);
+            d0Trace.luna_action = d0Enum(
+              lunaUnderstandingV12?.interpretation?.luna_decision?.next_action ||
+              lunaUnderstandingV12?.luna_decision?.next_action, d0Actions);
+            d0Trace.luna_error = d0Enum(lunaUnderstandingV12?.error_code,
+              ["timeout","invalid_semantic_output","unsafe_persona_answer",
+                "invalid_delegation","provider_http_failure",
+                "unparseable_model_output","other_a1_failure"]);
+            d0Trace.authorized_context_loaded = Boolean(lunaContextLoadedV12);
+            d0Trace.stored_memory_loaded = Array.isArray(lunaStoredMemoryV12) &&
+              lunaStoredMemoryV12.length > 0;
+          }
           const lunaPlanV12 = lunaUnderstandingV12?.interpretation?.luna_decision ||
             lunaUnderstandingV12?.luna_decision || null;
           lunaStateChangesV12=applyLunaDecisionToContextV12(
@@ -4225,11 +4256,29 @@ export default {
                 ? personaA1.interpretation : null
           });
 
+        if (d0Trace) {
+          d0Trace.pre_policy_route = d0Enum(route, d0Routes);
+          d0Trace.luna_submitted = Boolean(
+            personaA1?.decision === "route" && lunaMaySteerV12 &&
+            !completedProjectSearchContinuationV1 &&
+            !p0BeforeDecision.explicitRequest && !resumedContextReference);
+          d0Trace.policy_action = d0Enum(nextAction?.action, d0Actions);
+          d0Trace.policy_reason = d0Enum(nextAction?.reason, [
+            "luna_validated_semantic_action_v12","explicit_persona_route",
+            "conversation_reference","pure_semantic_profile_update",
+            "unresolved_request_clarification","verified_fact_route",
+            "property_search_route","comparison_route","advisory_route",
+            "contact_route","semantic_request_unresolved","knowledge_question_route",
+            "open_conversation_follow_up","clarification_route",
+            "no_actionable_route","unknown_route_safe_fallback",
+            "resumed_conversation_context_reference"]);
+        }
         route =
           routeForNextActionV1(
             nextAction,
             route
           );
+        if (d0Trace) d0Trace.executor_route = d0Enum(route, d0Routes);
 
         /*
           Interpreter clarification is provisional.
@@ -5042,6 +5091,12 @@ interpreterClarification =
             }
             }
           }
+          if (d0Trace) {
+            d0Trace.executor = "prima_search";
+            d0Trace.checkpoint = pendingStateSavedV12 === true ? "saved" :
+              pendingStateSavedV12 === false ? "failed" : "not_required";
+            d0Emit("tool_request");
+          }
           return json({
             ...primaSearchRequest,
 
@@ -5660,6 +5715,17 @@ interpreterClarification =
                 })
             : null;
 
+          if (d0Trace) {
+            d0Trace.final_source = contactDecision?.answer_override ? "contact" :
+              funnelDecision?.answer_override ? "funnel" :
+              localAnswer ? "local" : structuredAnswer?.answer ? "structured" :
+              verifiedProjectOverview ? "verified_overview" :
+              openAIResult?.answer ? "openai_composer" :
+              fallbackAnswer ? "grounded_fallback" : "routing_preview";
+            d0Trace.final_model_attempted = Boolean(useOpenAI);
+            d0Trace.final_model_answered = Boolean(openAIResult?.answer);
+            d0Trace.evidence_present = Number(evidencePack?.meta?.source_count || 0) > 0;
+          }
           const baseAnswer =
             contactDecision
               .answer_override ||
@@ -6933,6 +6999,13 @@ response.meta.used_search =
             total_contact_persistence_ms: i33Duration("state_write_end", "contact_persistence_end"),
             openai_calls_attempted: responsePayload?.meta?.openai_calls_attempted ?? null
           }));
+        }
+        if (d0Trace) {
+          d0Trace.response_type = d0Enum(responsePayload?.response_type,
+            ["answer","clarification","tool_request","lead_transition",
+              "recommendation","search_results","error"]);
+          d0Trace.used_search = Boolean(responsePayload?.meta?.used_search);
+          d0Emit("final_response");
         }
         responsePayload.meta.persona_a1_before_model_ms = a1StartedAt === null
           ? null : a1StartedAt - workerTurnStartedAt;

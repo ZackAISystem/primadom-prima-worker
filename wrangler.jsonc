@@ -11,6 +11,7 @@
   ],
   "vars": {
     "PRIMA_PERSONA_GENERATIVE_A1": "1",
-    "PRIMA_SEARCH_PRODUCTION": "1"
+    "PRIMA_SEARCH_PRODUCTION": "1",
+    "PRIMA_TURN_TRACE": "1"
   }
 }
