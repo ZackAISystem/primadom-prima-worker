@@ -4,8 +4,12 @@ import { buildSearchRouteResponse } from "./search-response.js";
 // have different continuation semantics and must stay on their D5 path.
 // This module neither queries nor ranks the catalog; it only pages a
 // canonical, bounded batch already supplied by the existing search bridge.
-export function prepareFastProjectPaginationV1({message,context,original,turn}={}) {
-  if (message !== "Show 3 more" ||
+export function prepareFastProjectPaginationV1({message,context,original,turn,operation="ui_pagination"}={}) {
+  // UI buttons retain their established contract. The Luna path passes a
+  // typed internal operation, not an English string or a second classifier.
+  const authorizedOperation = operation === "semantic_page_more" ||
+    (operation === "ui_pagination" && message === "Show 3 more");
+  if (!authorizedOperation ||
       turn?.version !== "ConversationTurnV1" ||
       turn?.phase !== "initial" ||
       !Number.isInteger(turn.turn_seq) || turn.turn_seq < 2 ||

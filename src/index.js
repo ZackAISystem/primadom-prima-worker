@@ -4309,7 +4309,7 @@ export default {
           if (nextAction.action === "PAGE_MORE") {
             // Use the exact paginator already used by the UI button.
             verifiedBatch = prepareFastProjectPaginationV1({
-              message: "Show 3 more", context: normalizedBatch,
+              operation: "semantic_page_more", context: normalizedBatch,
               original: existingBatch, turn
             });
           } else if (
