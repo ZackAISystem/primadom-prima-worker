@@ -1,0 +1,74 @@
+{
+  "scenarios": [
+    {
+      "id": "S04",
+      "category": "developer_overview",
+      "message": "Tell me about Emaar as a developer and what a buyer should evaluate before choosing one of its projects.",
+      "expected_actions": [
+        "KNOWLEDGE_QA",
+        "ADVISORY",
+        "EXACT_FACT"
+      ],
+      "expected_routes": [
+        "market_question",
+        "page_question",
+        "exact_fact"
+      ],
+      "must_not_actions": [
+        "CONTACT"
+      ]
+    },
+    {
+      "id": "S07",
+      "category": "project_comparison",
+      "message": "Compare Dubai Hills Estate and Dubai Creek Harbour for a family who values schools, commute and long-term living.",
+      "expected_actions": [
+        "COMPARE",
+        "ADVISORY",
+        "KNOWLEDGE_QA"
+      ],
+      "expected_routes": [
+        "compare",
+        "recommendation",
+        "market_question"
+      ],
+      "must_not_actions": [
+        "CONTACT"
+      ]
+    },
+    {
+      "id": "S18",
+      "group": "contact_consent",
+      "category": "conditional_contact_not_now",
+      "message": "Maybe I will speak with an agent next month, but I do not want any calls or messages now. What can I research first?",
+      "expected_actions": [
+        "KNOWLEDGE_QA",
+        "ADVISORY",
+        "CLARIFY"
+      ],
+      "expected_routes": [],
+      "must_not_actions": [
+        "CONTACT"
+      ]
+    },
+    {
+      "id": "S29",
+      "group": "routing_conflict",
+      "category": "budget_without_search_request",
+      "message": "My maximum property budget is AED 2 million. I am not asking you to search; explain how much to reserve for fees and closing costs.",
+      "expected_actions": [
+        "KNOWLEDGE_QA",
+        "ADVISORY"
+      ],
+      "expected_routes": [
+        "market_question",
+        "recommendation",
+        "page_question"
+      ],
+      "must_not_actions": [
+        "SEARCH",
+        "CONTACT"
+      ]
+    }
+  ]
+}

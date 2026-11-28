@@ -388,6 +388,11 @@ export function buildLocalRouteAnswer({
   }
 
   if (route === "unsupported") {
+    // PT04 — A request to issue a legal ruling about property is a service
+    // boundary, not an unrelated topic. No invented certification or authority.
+    if (/\b(?:final|binding|official|definitive)\s+(?:(?:legal|regulatory)\s+)?(?:ruling|judg(?:e)?ment|determination|verdict|legal opinion)\b|\b(?:issue|make|give|provide)\s+(?:me\s+)?(?:a\s+)?(?:(?:final|binding|legal)\s+){0,2}(?:ruling|judg(?:e)?ment|legal verdict)\b/i.test(String(message || ""))) {
+      return "I can't issue a binding legal ruling or certify a property's legal status. For an official determination, use the relevant UAE land department or a qualified legal professional. I can help you prepare a document checklist and questions to verify, without claiming to make the decision for them.";
+    }
     const kind = classifyClearlyOffTopicRequest(message);
     // A brief acknowledgement is enough for clear off-topic turns;
     // don't promote every unrelated question into a property sales pitch.

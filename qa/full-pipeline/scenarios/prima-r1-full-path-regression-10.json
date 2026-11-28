@@ -1,0 +1,351 @@
+{
+  "contract": "PRIMA_R1_REGRESSION_10_FULL_PATH",
+  "scenario_count": 10,
+  "scope": "TEN_FRESH_SINGLE_TURN_MESSAGES_NO_FINAL_SEARCH",
+  "scenarios": [
+    {
+      "id": "S03",
+      "category": "rental_yield_definition",
+      "message": "Explain what rental yield means for a property investor.",
+      "expected_actions": [
+        "KNOWLEDGE_QA",
+        "ADVISORY"
+      ],
+      "must_not_actions": [
+        "CONTACT",
+        "SEARCH"
+      ],
+      "relevance_signals": {
+        "yield": [
+          "yield"
+        ],
+        "rental_income": [
+          "rent",
+          "rental",
+          "income"
+        ],
+        "relative_price": [
+          "annual",
+          "year",
+          "price",
+          "percentage",
+          "purchase"
+        ]
+      },
+      "min_relevance_signals": 3
+    },
+    {
+      "id": "S14",
+      "category": "freehold_leasehold_dubai",
+      "message": "What is the difference between freehold and leasehold property ownership in Dubai?",
+      "expected_actions": [
+        "KNOWLEDGE_QA",
+        "ADVISORY",
+        "EXACT_FACT"
+      ],
+      "must_not_actions": [
+        "CONTACT",
+        "SEARCH"
+      ],
+      "relevance_signals": {
+        "freehold": [
+          "freehold"
+        ],
+        "leasehold": [
+          "leasehold"
+        ],
+        "ownership": [
+          "own",
+          "ownership",
+          "rights",
+          "term",
+          "lease"
+        ]
+      },
+      "min_relevance_signals": 3
+    },
+    {
+      "id": "S15",
+      "category": "future_callback_no_authorization",
+      "message": "How can I request an agent callback in the future? Do not arrange one now and do not collect my contact details.",
+      "expected_actions": [
+        "KNOWLEDGE_QA",
+        "ADVISORY"
+      ],
+      "must_not_actions": [
+        "CONTACT",
+        "SEARCH"
+      ],
+      "relevance_signals": {
+        "callback": [
+          "callback",
+          "call",
+          "contact"
+        ],
+        "future_process": [
+          "request",
+          "arrange",
+          "ask",
+          "book",
+          "how"
+        ],
+        "consent_boundary": [
+          "when you",
+          "if you",
+          "only if",
+          "without",
+          "not now",
+          "no"
+        ]
+      },
+      "min_relevance_signals": 2
+    },
+    {
+      "id": "S16",
+      "category": "consultation_requirements_no_consent",
+      "message": "What information would an agent need for a consultation? I am asking for an explanation, not giving permission to contact me.",
+      "expected_actions": [
+        "KNOWLEDGE_QA",
+        "ADVISORY"
+      ],
+      "must_not_actions": [
+        "CONTACT",
+        "SEARCH"
+      ],
+      "relevance_signals": {
+        "information": [
+          "information",
+          "details",
+          "provide"
+        ],
+        "property_requirements": [
+          "budget",
+          "location",
+          "property",
+          "type",
+          "bedroom",
+          "preferences"
+        ],
+        "consultation": [
+          "consult",
+          "agent",
+          "advisor"
+        ]
+      },
+      "min_relevance_signals": 2
+    },
+    {
+      "id": "S17",
+      "category": "mortgage_explanation_no_contact",
+      "message": "Do not make a lead or contact me. Just explain how mortgages usually work for property buyers in Dubai.",
+      "expected_actions": [
+        "KNOWLEDGE_QA",
+        "ADVISORY"
+      ],
+      "must_not_actions": [
+        "CONTACT",
+        "SEARCH"
+      ],
+      "relevance_signals": {
+        "mortgage": [
+          "mortgage"
+        ],
+        "financing": [
+          "loan",
+          "financing",
+          "lender",
+          "bank",
+          "down payment",
+          "interest"
+        ],
+        "process": [
+          "afford",
+          "eligib",
+          "repay",
+          "deposit",
+          "approval",
+          "rate"
+        ]
+      },
+      "min_relevance_signals": 2
+    },
+    {
+      "id": "S18",
+      "category": "no_contact_research_steps",
+      "message": "Maybe I will speak with an agent next month, but I do not want any calls or messages now. What can I research first?",
+      "expected_actions": [
+        "KNOWLEDGE_QA",
+        "ADVISORY"
+      ],
+      "must_not_actions": [
+        "CONTACT",
+        "SEARCH"
+      ],
+      "relevance_signals": {
+        "research": [
+          "research",
+          "look at",
+          "compare",
+          "evaluate",
+          "review",
+          "check"
+        ],
+        "buyer_due_diligence": [
+          "developer",
+          "location",
+          "district",
+          "budget",
+          "fees",
+          "schools",
+          "project",
+          "price",
+          "yield",
+          "ownership"
+        ],
+        "next_steps": [
+          "first",
+          "start",
+          "priorit",
+          "begin",
+          "consider",
+          "before"
+        ]
+      },
+      "min_relevance_signals": 2
+    },
+    {
+      "id": "S24",
+      "category": "canceled_search_explain_risks",
+      "message": "Find two-bedroom off-plan apartments in Dubai. On second thought, do not search: explain the risks of buying off-plan instead.",
+      "expected_actions": [
+        "KNOWLEDGE_QA",
+        "ADVISORY"
+      ],
+      "must_not_actions": [
+        "CONTACT",
+        "SEARCH"
+      ],
+      "relevance_signals": {
+        "offplan": [
+          "off.plan",
+          "construction",
+          "developer"
+        ],
+        "risk": [
+          "risk",
+          "delay",
+          "uncertaint",
+          "completion",
+          "schedule",
+          "handover"
+        ],
+        "mitigation": [
+          "check",
+          "verify",
+          "escrow",
+          "contract",
+          "due diligence",
+          "payment"
+        ]
+      },
+      "min_relevance_signals": 2
+    },
+    {
+      "id": "S26",
+      "category": "gross_yield_vs_net_yield_no_search",
+      "message": "I do not want property listings. Explain the difference between gross yield and net yield.",
+      "expected_actions": [
+        "KNOWLEDGE_QA",
+        "ADVISORY"
+      ],
+      "must_not_actions": [
+        "CONTACT",
+        "SEARCH"
+      ],
+      "relevance_signals": {
+        "gross": [
+          "gross"
+        ],
+        "net": [
+          "net"
+        ],
+        "costs": [
+          "cost",
+          "expense",
+          "fee",
+          "maintenance",
+          "deduct",
+          "service"
+        ]
+      },
+      "min_relevance_signals": 3
+    },
+    {
+      "id": "S27",
+      "category": "quoted_booking_not_direct_request",
+      "message": "A friend wrote the words \"book an agent call\" in a message. Explain what that phrase means, but do not book anything for me.",
+      "expected_actions": [
+        "KNOWLEDGE_QA",
+        "ADVISORY"
+      ],
+      "must_not_actions": [
+        "CONTACT",
+        "SEARCH"
+      ],
+      "relevance_signals": {
+        "booking": [
+          "book",
+          "booking",
+          "arrange",
+          "schedule"
+        ],
+        "agent": [
+          "agent",
+          "advisor"
+        ],
+        "call": [
+          "call",
+          "phone",
+          "speak"
+        ]
+      },
+      "min_relevance_signals": 2
+    },
+    {
+      "id": "S29",
+      "category": "fees_closing_costs_no_search",
+      "message": "My maximum property budget is AED 2 million. I am not asking you to search; explain how much to reserve for fees and closing costs.",
+      "expected_actions": [
+        "KNOWLEDGE_QA",
+        "ADVISORY"
+      ],
+      "must_not_actions": [
+        "CONTACT",
+        "SEARCH"
+      ],
+      "relevance_signals": {
+        "fees": [
+          "fee",
+          "cost",
+          "charge"
+        ],
+        "transaction": [
+          "registration",
+          "transfer",
+          "dld",
+          "broker",
+          "closing",
+          "mortgage"
+        ],
+        "budget": [
+          "budget",
+          "reserve",
+          "allow",
+          "percent",
+          "aed"
+        ]
+      },
+      "min_relevance_signals": 2
+    }
+  ]
+}

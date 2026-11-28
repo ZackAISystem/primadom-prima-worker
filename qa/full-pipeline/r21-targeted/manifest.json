@@ -1,0 +1,21 @@
+{
+  "version": "R2.1",
+  "files": {
+    "src/index.js": {
+      "before_sha256": "38305a8af0181da9979fd3772529f31bb55264f7618da15c2fbb0d38095354e9",
+      "after_sha256": "69419347fe6aea82e8c8800fe1b0698dcee5b3ac393904fec4b527a1b814db0b"
+    },
+    "src/decision-policy.js": {
+      "before_sha256": "23ab3fd633bc6d92eda7c7de0ab24683e7e595a6da669913f9505d220f153d44",
+      "after_sha256": "fd0a44f996acfeaf73b2edc7c6a7801c4e4ad3c1e6b7963574f0427e2a66e66e"
+    },
+    "src/answer-priority-v2.js": {
+      "before_sha256": "4333d34d8b497e5af7ec4abe3b64ec4f363e23de3c1d091dbc7ddf76e061ee8b",
+      "after_sha256": "9effb39d3bc0a6391a4ec75d5db17273fcaedca232fdab51fbff148f940dc699"
+    },
+    "qa/full-pipeline/runners/prima-r2-answer-regression-10.py": {
+      "before_sha256": "3ba2aff2bee1877e92c0a80b5ec88cae67214da44e9ee26371f409e52f70d248",
+      "after_sha256": "bf1c19730726b3386a22fbbb927306f4885b3d3d39eff98db44d5bf6784f13fc"
+    }
+  }
+}

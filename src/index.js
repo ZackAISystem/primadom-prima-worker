@@ -1,3 +1,4 @@
+import { isGenericProjectCriteriaComparisonV1 } from "./generic-scope-v1.js";
 import { buildCommercialContextV1 } from "./commercial-context.js";
 import {
   analyzeRecommendationCriteriaV1,
@@ -7,9 +8,14 @@ import { handleD5DistrictPreview } from "./district-search-preview-v1.js";
 import { handleD4DeveloperPreview } from "./developer-search-preview-v1.js";
 import { discoverDevelopersV1 } from "./developer-discovery-v1.js";
 import { supabaseSelect as d4SupabaseSelect } from "./supabase.js";
-import { routeIntent, classifyClearlyOffTopicRequest } from "./router.js";
+import { routeIntent, classifyClearlyOffTopicRequest, isPropertyHandoffProcessInquiryV1 } from "./router.js";
+import { isInformationalContactInquiryV1, deniesCurrentContactAuthorizationV1, isGeneralEmirateScopeV1 } from "./contact-routing-safety-v1.js";
 import { normalizeConversationTurn } from "./conversation-turn.js";
 import { classifyPureBuyerProfileUpdateV1, buildBuyerProfileAcknowledgementV1 } from "./profile-update-v1.js";
+import { recoverContextualAnswerPT08 } from "./contextual-answer-ownership-pt08.js";
+import { recoverBudgetChangeAnswerPT10 } from "./budget-change-answer-pt10.js";
+import { classifyEllipticalBuyerPreferencePT12 } from "./elliptical-profile-fallback-pt12.js";
+import { recoverDeferredViewingAnswerPT11, extractViewingChannelFactPT11, hasDeferredViewingHoldPT11 } from "./deferred-viewing-answer-pt11.js";
 import {
   evaluateFastGate,
   resolveContextualPersonaIntent,
@@ -20,12 +26,15 @@ import { interpretRequest } from "./request-interpreter.js";
 import { eligible as personaA1Eligible, generate as personaA1Generate, requiresStructuredBuyerUnderstanding, isComplexFirstTurnDialogue } from "./persona-semantic-a1.js";
 import {
   resolveNamedEntity,
+  requiresNamedEntityClarificationV1,
   buildKnowledgeContext
 } from "./entity-resolver.js";
 import {
   extractProjectComparisonPair,
   extractProjectComparisonTarget
 } from "./compare.js";
+import { buildTypedTaskPlanV1, hasExplicitNoSearchV1 } from "./task-plan-v1.js";
+import { prepareVerifiedCompoundComparisonV1, combineVerifiedCompoundComparisonV1 } from "./compound-comparison-v1.js";
 import {
   extractMemoryFacts,
   isEvidenceBackedUserName,
@@ -76,10 +85,14 @@ import {
   maskClearedConversationMemoryV12
 } from "./conversation-state.js";
 import {
-  recognizeConversationMove
+  recognizeConversationMove,
+  routeAfterConversationMoveV12
 } from "./conversation-move.js";
 import {
   decideNextActionV1,
+  finalizeNextActionV12,
+  reconcileSemanticRouteV12,
+  authorizePrimaSearchV12,
   routeForNextActionV1
 } from "./decision-policy.js";
 import {
@@ -113,6 +126,24 @@ import {
 import { buildStructuredAnswer } from "./structured-answer.js";
 import { buildGroundedFallback, buildVerifiedProjectOverview } from "./grounded-fallback.js";
 import { buildLocalRouteAnswer } from "./local-responses.js";
+import {
+  classifyGeneralConceptDefinitionV1,
+  isMarketingPriceReliabilityQuestionV1
+} from "./general-concept-definition-v1.js";
+import { buildMissingTargetClarificationV1 } from "./missing-target-clarification-v1.js";
+import { buildFix39AnswerRecoveryV1 } from "./fix39-answer-recovery-v1.js";
+import {
+  shouldDeferMarketFallbackToComposerV2,
+  hasIndependentInformationalQuestionV2,
+  hasIndependentInformationalImperativeV4,
+  shouldPrioritizeIndependentAnswerOverFunnelV2,
+  isContextualComparisonContinuationV6,
+  isIndependentNoContactConstraintV6,
+  classifyOptOutIndependentKnowledgeV8,
+  isBudgetPurchaseCostQuestionV23,
+  buildOptOutResearchAnswerV23,
+  isConceptualBuyerComparisonFix01V3
+} from "./answer-priority-v2.js";
 import {
   getToolIds,
   canUseTool
@@ -434,13 +465,15 @@ function buildResponse({
 // A Persona/refusal/name turn must never authorize a contact request merely
 // because the Router, semantic model or Funnel detects a contact-related word.
 // This is authorization, not semantic routing or a catalogue of answers.
-function inspectPersonaContactConsentV1({ message = "", route = "", activeMemory = [] } = {}) {
+function inspectPersonaContactConsentV1({ message = "", route = "", activeMemory = [], semanticCommercialIntent = "none" } = {}) {
   const raw = String(message || "").trim();
   const normalized = raw.replaceAll("’", "'");
   // Do not confuse declining a phone channel with declining the handoff.
   // Permanent contact opt-out, channel preference and conditional interest
   // are distinct permissions; Funnel owns commercial timing.
-  const refusal = explicitContactOptOut(normalized);
+  const refusal = explicitContactOptOut(normalized) || semanticCommercialIntent === "contact_opt_out";
+  const informationalContact = isInformationalContactInquiryV1(normalized);
+  const permissionDenied = deniesCurrentContactAuthorizationV1(normalized);
   const channelPreference = /\b(?:phone|whatsapp|number)\b/i.test(normalized) &&
     /\b(?:rather not|prefer not|don't want|do not want|without|no phone)\b/i.test(normalized);
   const conditionalInterest = /\b(?:viewing|site visit|property visit)\b/i.test(normalized) &&
@@ -454,25 +487,29 @@ function inspectPersonaContactConsentV1({ message = "", route = "", activeMemory
   const h29DirectRequest = inspectDirectContactH29(normalized).direct_request;
   const namingOnly = naming && !explicitHandoffRequest(normalized) && !contactOfferedByUser && !h29DirectRequest;
   // Positive evidence must be in the user's CURRENT text, never a model route.
-  const explicitRequest = !refusal && !namingOnly &&
+  const explicitRequest = !refusal && !permissionDenied && !informationalContact && !namingOnly &&
     (explicitHandoffRequest(normalized) || h29DirectRequest) &&
     !/\b(?:not ready|not yet|don't want|do not want)\s+(?:to\s+)?(?:book|arrange|schedule|contact)\b/i.test(normalized);
   const positiveRequest = explicitRequest;
   const prior = [...(Array.isArray(activeMemory) ? activeMemory : [])]
     .reverse().find(fact => fact?.fact_key === "funnel_state")?.fact_value || null;
-  const consentFollowThrough = !refusal && !namingOnly &&
+  const consentFollowThrough = !refusal && !permissionDenied && !informationalContact && !namingOnly &&
     ["handoff_accepted", "awaiting_contact"].includes(prior?.status);
-  const acceptance = !refusal && !namingOnly && prior?.status === "cta_offered" &&
+  const acceptance = !refusal && !permissionDenied && !informationalContact && !namingOnly && prior?.status === "cta_offered" &&
     /^(?:yes(?:,? please)?|sure|okay|ok|please do|go ahead|let's do it|connect me|sounds good)[.!\s]*$/i.test(normalized);
-  const consent = Boolean(positiveRequest || consentFollowThrough || acceptance || (!refusal && contactOfferedByUser));
+  const consent = !permissionDenied && !informationalContact && Boolean(positiveRequest || consentFollowThrough || acceptance || (!refusal && contactOfferedByUser));
   const personaScope = ["persona_question", "unsupported", "contact_intent"].includes(route);
   const priorOfferDecline = prior?.status === "cta_offered" &&
     /^(?:not now|no thanks|no thank you|maybe later|not yet|i(?:'m| am) not ready)\b/i.test(normalized);
-  const suppress = refusal || namingOnly ||
+  const suppress = refusal || permissionDenied || informationalContact || namingOnly ||
     (personaScope && !consent && !conditionalInterest && !priorOfferDecline);
-  const hasOtherTask = /\b(?:find|show|search|compare|recommend|explain|tell me about|what|which|how|why)\b/i.test(normalized) &&
-    /\b(?:property|properties|projects?|developers?|districts?|areas?|prices?|payment|investment|compare)\b/i.test(normalized);
-  return { refusal, naming: namingOnly, consent, suppress, hasOtherTask, prior,
+  // A contact refusal must not swallow an independent informational question.
+  // This only preserves an answer task; it never authorizes contact.
+  const hasOtherTask = (/\b(?:find|show|search|compare|recommend|explain|tell me about|what|which|how|why)\b/i.test(normalized) &&
+    /\b(?:property|properties|projects?|developers?|districts?|areas?|prices?|payment|investment|compare)\b/i.test(normalized)) ||
+    hasIndependentInformationalQuestionV2(normalized) ||
+    hasIndependentInformationalImperativeV4(normalized);
+  return { refusal, informationalContact, permissionDenied, naming: namingOnly, consent, suppress, hasOtherTask, prior,
     explicitRequest, conditionalInterest, priorOfferDecline, channelPreference };
 }
 // END_P0_PERSONA_CONTACT_CONSENT_BOUNDARY_20261022
@@ -646,11 +683,17 @@ const PROPERTY_SEARCH_CONSTRAINT_FACT_KEYS_V1 =
 
 function promoteConstraintLedPropertySearchRoute(
   route,
-  facts = []
+  facts = [],
+  message = ""
 ) {
-  if (route !== "unsupported") {
-    return route;
-  }
+  if (route !== "unsupported") return route;
+  // PT-02: a user-stated preference is not an instruction to search.
+  // Restrict this legacy bridge to an explicit catalogue request.
+  const q = String(message || "").replaceAll("’", "'");
+  const catalogAction = /\b(?:find|show(?: me)?|list|search(?: for)?|browse|recommend|suggest|shortlist|give me (?:options|listings))\b/i.test(q);
+  const catalogTarget = /\b(?:projects?|properties|apartments?|villas?|townhouses?|homes?|units?|developers?|districts?|areas|communities|listings)\b/i.test(q);
+  const negatedSearch = /\b(?:do not|don't|never|without|not asking you to)\s+(?:(?:start|run|do)\s+)?(?:search|find|show|recommend|list)\b/i.test(q);
+  if (!catalogAction || !catalogTarget || negatedSearch) return route;
 
   const hasSearchConstraint =
     (Array.isArray(facts) ? facts : [])
@@ -1945,6 +1988,18 @@ export default {
         // P0-01: a completed, same-message project Search tool result is
         // evidence of an already chosen action, not a new question to route.
         // Do not confuse it with F1 recommendation or a stale search context.
+        // R2.2 Phase B1: a server-checkpointed multi-task continuation.
+        // Never accept the task plan itself from the browser.
+        let completedCompareSearchContinuationV1 = false;
+        // B2: hash-only binding of the initial authorized user request.
+        // The browser must echo the same original message on continuation.
+        // No raw user message is stored in pending semantic state.
+        const compoundTurnMessageHashV1 =
+          turn?.phase === "initial" || turn?.phase === "tool_continuation"
+            ? Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",
+                new TextEncoder().encode(String(message || "")))))
+                .map(n => n.toString(16).padStart(2,"0")).join("")
+            : null;
         let completedProjectSearchContinuationV1 =
           turn?.phase === "tool_continuation" &&
           body?.search_context?.version === "SearchContextV1" &&
@@ -1975,6 +2030,23 @@ export default {
         const d0Emit = stage => {
           if (d0Trace) console.info("PRIMA_V12_TURN_TRACE", JSON.stringify({...d0Trace,stage}));
         };
+        // PRIMA_QA_RUNTIME_TRACE_R22417: local-only diagnostics, no user text/PII.
+        const qaActive = env?.PRIMA_QA_RUNTIME_TRACE === "1";
+        const qaTraceId = qaActive ? crypto.randomUUID() : null;
+        const qaStart = Date.now();
+        const qaEnum = (x, values) => values.includes(x) ? x : "other";
+        const qaEmit = (stage, details = {}) => {
+          if (!qaActive) return;
+          console.info("PRIMA_QA_TRACE", JSON.stringify({
+            version:"R2.24.17", trace_id:qaTraceId, stage,
+            elapsed_ms:Date.now()-qaStart,
+            turn_seq:Number.isInteger(turn?.turn_seq) ? turn.turn_seq : null,
+            phase: turn?.phase === "tool_continuation" ? "tool_continuation" : "initial",
+            ...details
+          }));
+        };
+        qaEmit("turn_begin", {module:"src/index.js", fn:"fetch",
+          search_context_present:Boolean(body?.search_context)});
         let a1StartedAt = null;
         let a1FinishedAt = null;
         let interpreterCallAttempted = false;
@@ -2029,12 +2101,29 @@ export default {
           const semanticRoute = h29Direct.direct_request
             ? "contact_intent" : routeIntent(message, lunaContextV12);
           a1StartedAt = Date.now();
-          lunaUnderstandingV12 = await personaA1Generate({
-            env, message, context: lunaContextV12,
-            memory: semanticMemory, route: semanticRoute,
-            dialogueMode: isComplexFirstTurnDialogue({message, turn}) &&
-              !h29Direct.direct_request
-          });
+          // PT07: preserve Persona internals, but cap this Worker wait if the
+          // provider/test transport ignores Persona's existing abort signal.
+          // A late read-only model reply is never applied to this turn.
+          let pt07LunaTimer = null;
+          try {
+            lunaUnderstandingV12 = await Promise.race([
+              personaA1Generate({
+                env, message, context: lunaContextV12,
+                memory: semanticMemory, route: semanticRoute,
+                dialogueMode: isComplexFirstTurnDialogue({message, turn}) &&
+                  !h29Direct.direct_request
+              }),
+              new Promise(resolve => {
+                pt07LunaTimer = setTimeout(() => resolve({
+                  decision: "error", used: true, usage_unknown: true,
+                  error_code: "timeout", timed_out: true,
+                  latency_ms: Date.now() - a1StartedAt
+                }), 26000);
+              })
+            ]);
+          } finally {
+            if (pt07LunaTimer !== null) clearTimeout(pt07LunaTimer);
+          }
           a1FinishedAt = Date.now();
           if (d0Trace) {
             d0Trace.luna_outcome = d0Enum(lunaUnderstandingV12?.decision,
@@ -2052,6 +2141,24 @@ export default {
             d0Trace.stored_memory_loaded = Array.isArray(lunaStoredMemoryV12) &&
               lunaStoredMemoryV12.length > 0;
           }
+          qaEmit("luna_result", {
+            module:"src/persona-semantic-a1.js",fn:"generate",
+            decision:qaEnum(lunaUnderstandingV12?.decision,["route","answer","delegate","error"]),
+            primary_route:qaEnum(lunaUnderstandingV12?.interpretation?.primary_route,d0Routes),
+            next_action:qaEnum(lunaUnderstandingV12?.interpretation?.luna_decision?.next_action ||
+              lunaUnderstandingV12?.luna_decision?.next_action,d0Actions),
+            tasks_count:Array.isArray(lunaUnderstandingV12?.interpretation?.tasks)
+              ? lunaUnderstandingV12.interpretation.tasks.length : null,
+            confidence:Number.isFinite(lunaUnderstandingV12?.interpretation?.overall_confidence)
+              ? lunaUnderstandingV12.interpretation.overall_confidence : null,
+            duration_ms:Number.isFinite(lunaUnderstandingV12?.latency_ms)
+              ? lunaUnderstandingV12.latency_ms:null,
+            input_tokens:lunaUnderstandingV12?.usage?.input_tokens ?? null,
+            output_tokens:lunaUnderstandingV12?.usage?.output_tokens ?? null,
+            error_code:qaEnum(lunaUnderstandingV12?.error_code,
+              ["timeout","invalid_semantic_output","unsafe_persona_answer",
+              "invalid_delegation","provider_http_failure","unparseable_model_output","other_a1_failure"])
+          });
           const lunaPlanV12 = lunaUnderstandingV12?.interpretation?.luna_decision ||
             lunaUnderstandingV12?.luna_decision || null;
           lunaStateChangesV12=applyLunaDecisionToContextV12(
@@ -2071,6 +2178,54 @@ export default {
             extractedFacts=[...extractedFacts.filter(f=>!changed.has(f?.fact_key)),
               ...newFacts];
           }
+        }
+
+        // PT12: a validated LUNA failure must not convert a plainly declared
+        // buyer preference into an unsolicited Search. Reuse the existing
+        // guarded canonical Memory persistence, never invent a search result.
+        // Mixed requests, contact, comparisons, and tool continuations remain
+        // owned by their existing routes.
+        // PT12.1: validated LUNA SEARCH is not sufficient authorization to
+        // search when the user only states a bounded, explicit preference.
+        // This exception does not apply in an active property-search thread:
+        // terse preference fragments there may be genuine search refinements.
+        const pt12ActiveSearchThread =
+          lunaContextV12?.conversation?.dialogue_state?.active_thread?.active_topic ===
+            "property_search";
+        const pt12LunaSearchWithoutRequest =
+          lunaUnderstandingV12?.decision === "route" &&
+          lunaUnderstandingV12?.interpretation?.primary_route === "property_search" &&
+          lunaPlanV12?.next_action === "SEARCH" &&
+          !pt12ActiveSearchThread;
+        const pt12UnsafeClear = Array.isArray(lunaStateChangesV12?.changes) &&
+          lunaStateChangesV12.changes.some(change => change?.operation === "clear");
+        const pt12PreferenceRecovery = turn?.phase === "initial" &&
+          (lunaUnderstandingV12?.decision === "error" ||
+            pt12LunaSearchWithoutRequest) &&
+          !h29Direct.direct_request &&
+          !pt12UnsafeClear &&
+          !(lunaUnderstandingV12?.decision === "error" &&
+            lunaStateChangesV12?.changes?.length) &&
+          !body?.search_context && !body?.pagination_fastpath_v1
+            ? classifyEllipticalBuyerPreferencePT12(
+                message, body?.page?.language_code || "en"
+              )
+            : null;
+        if (pt12PreferenceRecovery) {
+          qaEmit("pt12_preference_fallback", {
+            module:"src/elliptical-profile-fallback-pt12.js",
+            fn:"classifyEllipticalBuyerPreferencePT12",
+            memory_fact_count:pt12PreferenceRecovery.facts.length,
+            luna_error:lunaUnderstandingV12?.error_code || "other",
+            reason:pt12LunaSearchWithoutRequest
+              ? "explicit_preference_overrides_unrequested_search"
+              : "luna_error_profile_recovery"
+          });
+          const pt12Response = await persistDeterministicProfileTurnV1({
+            env, conversationId, body, message,
+            facts:pt12PreferenceRecovery.facts
+          });
+          return json(pt12Response);
         }
 
         // MEM11: single explicit project decisions are not Search or Persona.
@@ -2102,6 +2257,16 @@ export default {
             facts: mem07Profile.facts
           });
           return json(mem07Response);
+        }
+
+        // PT11: a preferred contact channel is a user-declared preference,
+        // never permission to contact anyone. Reuse the existing fact store.
+        const pt11ChannelFact = extractViewingChannelFactPT11({
+          message, recentMessages:lunaContextV12?.conversation?.recent_messages
+        });
+        if (pt11ChannelFact && !extractedFacts.some(f =>
+            f?.fact_key === 'preferred_contact_channel')) {
+          extractedFacts.push(pt11ChannelFact);
         }
 
         // S3.1: preserve the authorized, already-loaded memory for the whole
@@ -2139,9 +2304,12 @@ export default {
         route =
           promoteConstraintLedPropertySearchRoute(
             route,
-            extractedFacts
+            extractedFacts,
+            message
           );
         if (h29Direct.direct_request) route = "contact_intent";
+        qaEmit("router", {module:"src/router.js",fn:"routeIntent",
+          route:qaEnum(route,d0Routes)});
 
         // MEM02: all unambiguous greeting-only turns stay entirely local,
         // including turn 2+ with Persona A1 enabled. Preserve mixed tasks.
@@ -2166,6 +2334,10 @@ export default {
               contextEnvelope
           });
 
+        qaEmit("fast_gate", {module:"src/fast-gate.js",fn:"evaluateFastGate",
+          route:qaEnum(route,d0Routes),
+          kind:qaEnum(fastGate?.kind,["route","persona","fact","clarification","search","contact","none"]),
+          gated:Boolean(fastGate?.gate || fastGate?.blocked)});
         // Block A: mixed buyer intent is not a zero-token Persona turn.
         // This guard selects an EXISTING semantic route; it does not answer.
         const blockAEarlyMixedIntent =
@@ -2295,7 +2467,8 @@ export default {
           route =
             promoteConstraintLedPropertySearchRoute(
               route,
-              extractedFacts
+              extractedFacts,
+              message
             );
           if (h29Direct.direct_request) route = "contact_intent";
         } else if (!statelessFastPath) {
@@ -2500,6 +2673,21 @@ export default {
               Array.isArray(body.search_context.results) &&
               Boolean(normalizeSearchContextV1(body.search_context))) {
             completedProjectSearchContinuationV1=true;
+            const compareCheckpoint = pendingV12.compound_compare_v1;
+            if(compareCheckpoint?.version === "CompoundCompareCheckpointV1" &&
+               compareCheckpoint.status === "comparison_pending" &&
+               typeof compareCheckpoint.message_sha256 === "string" &&
+               compareCheckpoint.message_sha256 === compoundTurnMessageHashV1 &&
+               Array.isArray(compareCheckpoint.required_routes) &&
+               compareCheckpoint.required_routes.length >= 2 &&
+               compareCheckpoint.required_routes.length <= 4 &&
+               compareCheckpoint.required_routes.includes("compare") &&
+               compareCheckpoint.required_routes.includes("property_search") &&
+               compareCheckpoint.required_routes.every(r =>
+                 ["compare","property_search","market_question","page_question",
+                  "exact_fact","recommendation","follow_up"].includes(r))) {
+              completedCompareSearchContinuationV1 = true;
+            }
           }
           if(turn?.phase==="tool_continuation" && pendingV12?.turn_id===turn.turn_id &&
               pendingV12?.turn_seq===turn.turn_seq) {
@@ -2539,7 +2727,8 @@ export default {
           route =
             promoteConstraintLedPropertySearchRoute(
               route,
-              extractedFacts
+              extractedFacts,
+              message
             );
           if (h29Direct.direct_request) route = "contact_intent";
         }
@@ -3675,12 +3864,6 @@ export default {
             )
           );
 
-        const interpreterDowngradedInDomain =
-          interpretedRoute ===
-            "unsupported" &&
-          deterministicRouteBeforeInterpreter !==
-            "unsupported";
-
         const currentTurnSemanticMemoryUpdate =
           Array.isArray(
             resolvedInterpretation
@@ -3703,30 +3886,34 @@ export default {
             ?.turn_kind ===
               "profile_update";
 
-        if (interpretedRouteIsCanonical) {
-          if (
-            interpreterDowngradedInDomain
-          ) {
-            route =
-              deterministicRouteBeforeInterpreter;
-
-            interpreterClarification =
-              null;
-          } else {
-            route = interpretedRoute;
-          }
+        // R2.5: one canonical reconciliation point. When a successful Luna
+        // route supplied this very interpretation, old Router/Interpreter
+        // recovery cannot replace it with a different user intent.
+        // Registry, Consent, verified references and Decision Policy remain
+        // independently authoritative within their existing safety scopes.
+        const r25LunaRouteAuthoritative = Boolean(
+          personaA1?.decision === "route" && lunaMaySteerV12 &&
+          !a1NeedsTypedInterpreterV12 &&
+          Number(personaA1?.interpretation?.overall_confidence || 0) >= 0.70 &&
+          interpreterResult?.interpretation === personaA1.interpretation &&
+          interpretedRouteIsCanonical
+        );
+        const r25Reconciliation = reconcileSemanticRouteV12({
+          interpretedRoute: interpretedRouteIsCanonical ? interpretedRoute : null,
+          deterministicRoute: deterministicRouteBeforeInterpreter,
+          lunaRouteAuthoritative: r25LunaRouteAuthoritative,
+          pureProfileUpdate: currentTurnSemanticProfileUpdate &&
+            (!Array.isArray(resolvedInterpretation?.tasks) ||
+             resolvedInterpretation.tasks.length === 0)
+        });
+        if (interpretedRouteIsCanonical ||
+            (currentTurnSemanticProfileUpdate &&
+             (!Array.isArray(resolvedInterpretation?.tasks) ||
+              resolvedInterpretation.tasks.length === 0))) {
+          route = r25Reconciliation.route;
         }
-
-        if (
-          currentTurnSemanticProfileUpdate &&
-          (!Array.isArray(resolvedInterpretation?.tasks) ||
-            resolvedInterpretation.tasks.length === 0)
-        ) {
-          route =
-            "recommendation";
-
-          interpreterClarification =
-            null;
+        if (r25Reconciliation.clearClarification) {
+          interpreterClarification = null;
         }
 
         /*
@@ -3776,14 +3963,23 @@ export default {
             changed_fields: []
           };
         }
-        if (
-          conversationMove
-            ?.effective_route
-        ) {
-          route =
-            conversationMove
-              .effective_route;
-        }
+        // R2.2: the second ConversationMove pass must not silently replace
+        // Luna's policy-valid task with an unrelated capability. Preserve
+        // verified entity references and persisted-thread resume behavior.
+        const r22LunaActionAccepted = personaA1?.decision === "route" &&
+          lunaMaySteerV12 && !a1NeedsTypedInterpreterV12 &&
+          decideNextActionV1({
+            route,
+            lunaDecision: contextEnvelope?.luna_decision_v12,
+            lunaInterpretation: personaA1?.interpretation
+          })?.reason === "luna_validated_semantic_action_v12";
+        route = routeAfterConversationMoveV12({
+          route,
+          move: conversationMove,
+          lunaActionAccepted: r22LunaActionAccepted,
+          hasVerifiedSuspendedThread: Boolean(contextEnvelope?.conversation
+            ?.dialogue_state?.continuity_references?.suspended_thread)
+        });
 
 
         // Final task-priority guard: a fresh, explicit advisory question after
@@ -4195,9 +4391,27 @@ export default {
 
         if (personaA1?.decision === "answer") route = "persona_question";
         // P0: the model's contact route never substitutes for human consent.
-        const p0BeforeDecision = inspectPersonaContactConsentV1({
-          message, route, activeMemory
+        const p0BeforeDecisionRaw = inspectPersonaContactConsentV1({
+          message, route, activeMemory,
+          semanticCommercialIntent: personaA1?.interpretation?.commercial_signal?.intent || "none"
         });
+        // PT06: a no-adviser condition inside a distinct answer request is
+        // never a live contact instruction (including "contact me" syntax).
+        // Reuse the existing authorization contract, without touching CRM.
+        const pt06NoAdvisorOffer = isIndependentNoContactConstraintV6(message);
+        const p0BeforeDecision = pt06NoAdvisorOffer
+          ? {...p0BeforeDecisionRaw, consent:false, explicitRequest:false,
+             refusal:true, suppress:true, permissionDenied:true}
+          : p0BeforeDecisionRaw;
+        // PT04 — Keep contextual viewing/contact *process* questions within
+        // property advice, even when a semantic contact label is not authorized.
+        // This never sets consent, contacts anyone or alters CRM/Memory/Search.
+        if (["unsupported", "contact_intent"].includes(route) &&
+            !p0BeforeDecision.consent &&
+            isPropertyHandoffProcessInquiryV1(message, contextEnvelope)) {
+          route = "market_question";
+          interpreterClarification = null;
+        }
         // A current, explicit user request can reopen an earlier opt-out.
         // Merely considering a viewing cannot authorize collecting contacts.
         // G19: semantic contact_intent can be a non-contact feasibility
@@ -4208,19 +4422,57 @@ export default {
           isUnconsentedProjectViewingQuestionV1({
             message, context: contextEnvelope, authorization: p0BeforeDecision
           });
+        // A genuine informational inquiry about human contact is Knowledge,
+        // even if Luna or a legacy route labeled the contact nouns differently.
+        if (p0BeforeDecision.informationalContact &&
+            ["contact_intent", "unsupported"].includes(route)) {
+          route = "market_question";
+          interpreterClarification = null;
+        }
         if (p0BeforeDecision.explicitRequest &&
             ["persona_question", "unsupported"].includes(route)) {
           route = "contact_intent";
           interpreterClarification = null;
-        } else if (route === "contact_intent" &&
-                   !p0BeforeDecision.consent &&
-                   !p0BeforeDecision.conditionalInterest &&
-                   !p0BeforeDecision.priorOfferDecline) {
+        }
+
+        // FIX39-03: semantic contact intent and authorization are separate.
+        // LUNA may identify a contact task, but cannot authorize a lead.
+        const p0UnverifiedSemanticContact = Boolean(
+          route === "contact_intent" &&
+          personaA1?.decision === "route" &&
+          personaA1?.interpretation?.primary_route === "contact_intent" &&
+          contextEnvelope?.luna_decision_v12?.next_action === "CONTACT" &&
+          Number(contextEnvelope?.luna_decision_v12?.confidence || 0) >= 0.85 &&
+          !p0BeforeDecision.consent &&
+          !p0BeforeDecision.refusal &&
+          !p0BeforeDecision.permissionDenied &&
+          !p0BeforeDecision.informationalContact &&
+          !p0BeforeDecision.naming &&
+          !g19ViewingInformationOnly &&
+          turn?.phase === "initial"
+        );
+
+        if (route === "contact_intent" &&
+            !p0BeforeDecision.consent &&
+            !p0BeforeDecision.conditionalInterest &&
+            !p0BeforeDecision.priorOfferDecline) {
           route = g19ViewingInformationOnly
             ? "page_question"
-            : p0BeforeDecision.naming ? "persona_question" : "unsupported";
+            : p0BeforeDecision.naming
+              ? "persona_question"
+              : p0UnverifiedSemanticContact
+                ? "contact_intent"
+                : "unsupported";
           interpreterClarification = null;
         }
+
+        qaEmit("semantic_contact_authorization_boundary", {
+          module: "src/index.js",
+          fn: "semantic_contact_authorization_boundary",
+          semantic_contact: p0UnverifiedSemanticContact,
+          authorized: Boolean(p0BeforeDecision.consent),
+          route
+        });
         // P0-01: continuation is the completion of the existing Search,
         // not a separate Persona turn. Keep the original action authoritative.
         if (completedProjectSearchContinuationV1) {
@@ -4228,7 +4480,56 @@ export default {
           conversationMove = null;
           interpreterClarification = null;
         }
-        let nextAction =
+        // R2.4: resolve a compound project→developer relationship BEFORE the
+        // single Decision Policy finalization. Registry is evidence, not a
+        // second semantic router or a contact authorization source.
+        const r24CompoundEligible = p003RelatedRequestV1(message) &&
+          (turn?.phase === "initial" || turn?.phase === "tool_continuation") &&
+          (turn?.phase === "initial" ||
+            (body?.search_context?.version === "SearchContextV1" &&
+             body?.search_context?.entity_type === "project" &&
+             ["results", "empty"].includes(body?.search_context?.state)));
+        let r24VerifiedRelation = null;
+        if (r24CompoundEligible) {
+          try {
+            r24VerifiedRelation = await p003VerifiedRelationshipV1({
+              env, message, interpretation: resolvedInterpretation,
+              context: contextEnvelope
+            });
+          } catch {
+            console.error("p003_relationship_resolution_unavailable");
+          }
+        }
+        // A continuation is completion of the same verified Search, not
+        // permission to invent a second search or accept unrelated results.
+        const p003BContinuationVerified = Boolean(
+          r24VerifiedRelation && turn?.phase === "tool_continuation" &&
+          body?.search_context?.version === "SearchContextV1" &&
+          body?.search_context?.language === "en" &&
+          body?.search_context?.entity_type === "project" &&
+          ["results", "empty"].includes(body?.search_context?.state) &&
+          Array.isArray(body?.search_context?.results) &&
+          [message, r24VerifiedRelation.query].includes(body?.search_context?.query)
+        );
+        const r24CompoundEvidence = Boolean(r24VerifiedRelation &&
+          (turn?.phase === "initial" || p003BContinuationVerified));
+
+        const r22TaskPlan = buildTypedTaskPlanV1({
+          interpretation: personaA1?.decision === "route" && lunaMaySteerV12
+            ? personaA1.interpretation : resolvedInterpretation,
+          phase: turn?.phase
+        });
+        const r22NoSearch = hasExplicitNoSearchV1(message);
+        qaEmit("typed_task_plan", {module:"src/task-plan-v1.js",
+          fn:"buildTypedTaskPlanV1",mode:r22TaskPlan.mode,
+          task_routes:r22TaskPlan.tasks.map(task=>task.route),
+          search_prohibited:r22NoSearch});
+        if (completedCompareSearchContinuationV1) {
+          qaEmit("compound_comparison_restored", {module:"src/index.js",fn:"fetch",
+            checkpoint:"server_verified",search_result:"verified",
+            comparison_status:"pending"});
+        }
+        const policyCandidateV12 =
           resumedContextReference
             ? {
                 version: "DecisionPolicyV1",
@@ -4255,24 +4556,60 @@ export default {
             // route that may have overwritten it during execution planning.
             lunaInterpretation:personaA1?.decision==="route" &&
               lunaMaySteerV12
-                ? personaA1.interpretation : null
+                ? personaA1.interpretation : null,
+            contactAuthorization: p0BeforeDecision.consent,
+            informationalContactInquiry: p0BeforeDecision.informationalContact,
+            typedTaskPlan: r22TaskPlan,
+            searchProhibited: r22NoSearch,
+            message
           });
 
-        // D2.1: A typed non-search action must never silently turn into SEARCH
-        // if its provenance or validation fails. Reject safely instead of
-        // executing a different tool. Explicit Contact retains its own gate.
-        const semanticNonSearchAction = personaA1?.decision === "route" &&
-          lunaMaySteerV12 && !p0BeforeDecision.explicitRequest &&
-          turn?.phase === "initial" &&
-          ["PAGE_MORE", "RESUME_SEARCH", "MEMORY_RECALL"].includes(
-            personaA1?.interpretation?.luna_decision?.next_action)
-            ? personaA1.interpretation.luna_decision.next_action : null;
-        if (semanticNonSearchAction && nextAction?.action !== semanticNonSearchAction &&
-            nextAction?.action === "SEARCH") {
-          nextAction = {version:"DecisionPolicyV1",action:"CLARIFY",
-            reason:"semantic_action_not_accepted"};
+        // R2.3: finalize in Decision Policy exactly once. This preserves D2.1
+        // non-search protections without letting index.js independently amend
+        // the selected next_action after the policy returns.
+        qaEmit("interpreter", {module:"src/request-interpreter.js",fn:"interpretRequest",
+          attempted:Boolean(interpreterCallAttempted),
+          disposition:qaEnum(interpreterResult?.decision,["route","answer","clarify","error"]),
+          tasks_count:Array.isArray(resolvedTasks)?resolvedTasks.length:null});
+        qaEmit("conversation_move", {module:"src/conversation-move.js",fn:"protectTopicMoveV1",
+          move:qaEnum(conversationMove?.move_type,
+            ["new_thread","switch","suspend","resume","refinement","continuation","reference","none"]),
+          effective_route:qaEnum(conversationMove?.effective_route,d0Routes)});
+        const nextAction = finalizeNextActionV12({
+          decision: policyCandidateV12,
+          personaDecision: personaA1?.decision,
+          lunaMaySteer: lunaMaySteerV12,
+          explicitContactRequest: p0BeforeDecision.explicitRequest,
+          phase: turn?.phase,
+          lunaInterpretation: personaA1?.interpretation,
+          verifiedCompoundSearch: r24CompoundEvidence
+        });
+
+        // FIX08A: recovered independent knowledge owns the answer.
+        // Contact refusal remains active in the existing P0 gate.
+        if (
+          ["COMPARE", "KNOWLEDGE_QA"].includes(nextAction?.action) &&
+          classifyOptOutIndependentKnowledgeV8(message)
+        ) {
+          interpreterClarification = null;
         }
 
+        qaEmit("decision_policy", {module:"src/decision-policy.js",
+          fn:"finalizeNextActionV12",route_before:qaEnum(route,d0Routes),
+          candidate:qaEnum(policyCandidateV12?.action,d0Actions),
+          final_action:qaEnum(nextAction?.action,d0Actions),
+          reason:qaEnum(nextAction?.reason,[
+            "luna_validated_semantic_action_v12","explicit_persona_route",
+            "conversation_reference","pure_semantic_profile_update",
+            "unresolved_request_clarification","verified_fact_route",
+            "property_search_route","comparison_route","advisory_route",
+            "contact_route","semantic_request_unresolved","knowledge_question_route",
+            "open_conversation_follow_up","clarification_route",
+            "no_actionable_route","unknown_route_safe_fallback",
+            "resumed_conversation_context_reference","semantic_action_not_accepted",
+            "verified_informational_contact_knowledge_r21",
+            "verified_compound_relationship_search_r24",
+            "typed_multitask_search_authorized_r22"])});
         if (d0Trace) {
           d0Trace.pre_policy_route = d0Enum(route, d0Routes);
           d0Trace.luna_submitted = Boolean(
@@ -4289,7 +4626,9 @@ export default {
             "open_conversation_follow_up","clarification_route",
             "no_actionable_route","unknown_route_safe_fallback",
             "resumed_conversation_context_reference",
-            "semantic_action_not_accepted"]);
+            "semantic_action_not_accepted",
+            "verified_informational_contact_knowledge_r21",
+            "verified_compound_relationship_search_r24"]);
         }
         route =
           routeForNextActionV1(
@@ -4361,6 +4700,8 @@ export default {
           interpreterClarification = null;
         }
 
+        qaEmit("executor_route", {module:"src/index.js",fn:"routeForNextActionV1",
+          route:qaEnum(route,d0Routes),action:qaEnum(nextAction?.action,d0Actions)});
         if (d0Trace) d0Trace.executor_route = d0Enum(route, d0Routes);
 
         /*
@@ -4530,6 +4871,9 @@ export default {
 
         if (
   !resumeRouteAuthoritative &&
+  !(r22TaskPlan.mode === "compare_and_search" && nextAction?.action === "SEARCH") &&
+  // R23: do not resolve "AED 2 million" as a developer/project name.
+  !isBudgetPurchaseCostQuestionV23(message) &&
   !deterministicEntityReady &&
   resolvedInterpretation &&
   !interpreterClarification &&
@@ -4655,8 +4999,29 @@ export default {
               String(message || "")
             );
 
+          // A generic emirate scope is not a requested named entity.
+          // The single-entity resolver may find several records called Dubai;
+          // do not interrupt a conceptual question to disambiguate them.
+          // FIX01 V3: protect conceptual buyer comparisons from an incidental
+          // unresolved district. Exact project/developer and verified fact
+          // requests remain under the existing entity gate.
+          const fix01V3ConceptualCompare = isConceptualBuyerComparisonFix01V3({
+            message, route, interpretation: resolvedInterpretation
+          });
+          if (fix01V3ConceptualCompare) interpreterClarification = null;
+
+          if (entityResolution?.status === "ambiguous" &&
+              isGeneralEmirateScopeV1({
+                message, route, entityName:entityResolution.entity_name
+              })) {
+            entityResolution = null;
+          }
           if (
             entityResolution?.status === "ambiguous" &&
+            !fix01V3ConceptualCompare &&
+            requiresNamedEntityClarificationV1({action:nextAction?.action,
+              interpretation:resolvedInterpretation,resolution:entityResolution,
+              message}) &&
             !f23DubaiMarketScope &&
             !f28VerifiedGeography
           ) {
@@ -4692,6 +5057,10 @@ export default {
 
           if (
             entityResolution?.status === "not_found" &&
+            !fix01V3ConceptualCompare &&
+            requiresNamedEntityClarificationV1({action:nextAction?.action,
+              interpretation:resolvedInterpretation,resolution:entityResolution,
+              message}) &&
             !f14BuyerProfileTerm &&
             !f27GenericRecommendationCategory &&
             !f28VerifiedGeography
@@ -4805,55 +5174,19 @@ interpreterClarification =
           request; only that completed pass continues
           into answer generation + persistence.
         */
-        // A validated Luna ADVISORY is not permission to launch Search.
-        // Keep the existing legacy recommendation-search path only when Luna
-        // did not make an authoritative semantic action choice.
-        const lunaOwnsAdvisoryV12 =
-          nextAction?.reason==="luna_validated_semantic_action_v12" &&
-          nextAction?.action==="ADVISORY";
-        const searchDispatchAllowed =
-          nextAction?.action === "SEARCH" ||
-          (
-            !lunaOwnsAdvisoryV12 &&
-            nextAction?.action === "ADVISORY" &&
-            route === "recommendation"
-          );
+        // R2.7: Decision Policy owns authorization for *every* Search V3
+        // request, including developer/portfolio/district special adapters.
+        const searchDispatchAllowed = authorizePrimaSearchV12({
+          decision: nextAction, route, phase: turn?.phase,
+          message, searchProhibited: r22NoSearch
+        });
 
-        // P0-03B verified relationship dispatch. No mutations or Search
-        // on ambiguous/missing canonical project/relation; existing routes win.
-        const p003BActive = p003RelatedRequestV1(message) &&
-          (turn?.phase === "initial" || turn?.phase === "tool_continuation") &&
-          (turn?.phase === "initial" ||
-            (body?.search_context?.version === "SearchContextV1" &&
-             body?.search_context?.entity_type === "project" &&
-             ["results","empty"].includes(body?.search_context?.state)));
-        let p003BRelation = null;
-        if (p003BActive) {
-          try {
-            p003BRelation = await p003VerifiedRelationshipV1({
-              env, message, interpretation:resolvedInterpretation,
-              context:contextEnvelope
-            });
-          } catch (error) {
-            console.error("p003_relationship_resolution_unavailable");
-          }
-        }
-        // Continuations must correspond to the exact original user turn or
-        // the verified canonical query, never an arbitrary search response.
-        const p003BContinuationVerified = Boolean(
-          p003BRelation && turn?.phase === "tool_continuation" &&
-          body?.search_context?.version === "SearchContextV1" &&
-          body?.search_context?.language === "en" &&
-          body?.search_context?.entity_type === "project" &&
-          ["results","empty"].includes(body?.search_context?.state) &&
-          Array.isArray(body?.search_context?.results) &&
-          [message,p003BRelation.query].includes(body?.search_context?.query)
-        );
-        if (p003BRelation &&
-            (turn?.phase === "initial" || p003BContinuationVerified)) {
-          route = "property_search";
-          // Keep original request for continuity and preserve the real
-          // confirmed project for Knowledge, not the user's ambient page.
+        // R2.4: no post-policy route reassignment. Only a policy-approved
+        // compound Search may attach Registry context / request Search V3.
+        // Existing continuation verification and the combined answer remain.
+        const p003BRelation = r24CompoundEvidence &&
+          nextAction?.action === "SEARCH" ? r24VerifiedRelation : null;
+        if (p003BRelation) {
           entityResolution = p003BRelation.resolution;
           knowledgeContextEnvelope = buildKnowledgeContext(
             contextEnvelope, p003BRelation.resolution
@@ -5083,7 +5416,9 @@ interpreterClarification =
             context: contextEnvelope
           });
 
-        const primaSearchRequest =
+        // R2.7: the complete priority chain is behind one policy gate.
+        // E33 below remains a second no-redispatch defense.
+        const primaSearchRequest = searchDispatchAllowed ? (
           (p003BRelation && turn?.phase === "initial")
             ? {
                 version:"PrimaToolRequestV1", tool:"prima_search",
@@ -5120,13 +5455,13 @@ interpreterClarification =
                   query: d4Text,
                   max_results: 3
                 }
-              : searchDispatchAllowed
-                ? buildPrimaSearchRequest({
-                    route,
+              : buildPrimaSearchRequest({
+                    route: r22TaskPlan.mode === "compare_and_search" &&
+                      nextAction?.action === "SEARCH" ? "property_search" : route,
                     message: e42DistrictSearchQuery,
                     context: contextEnvelope
                   })
-                : null;
+        ) : null;
 
         // E33_TOOL_CONTINUATION_DISPATCH_GUARD_V1
         // A tool continuation must consume its result,
@@ -5139,8 +5474,17 @@ interpreterClarification =
           // guarded server-owned checkpoint, Luna's initial slot decisions
           // could disappear before the normal Memory persistence pass.
           const pendingChanges=contextEnvelope?.luna_decision_v12?.changes || [];
+          const compoundCompareCheckpointV1 =
+            r22TaskPlan.mode === "compare_and_search" &&
+            nextAction?.action === "SEARCH" && !r22NoSearch
+              ? {version:"CompoundCompareCheckpointV1",
+                 status:"comparison_pending",
+                 message_sha256:compoundTurnMessageHashV1,
+                 required_routes:r22TaskPlan.tasks.map(task=>task.route)}
+              : null;
           let pendingStateSavedV12=null;
-          if(pendingChanges.length && typeof turn?.turn_id==="string" &&
+          if((pendingChanges.length || compoundCompareCheckpointV1) &&
+             typeof turn?.turn_id==="string" &&
               Number.isInteger(turn?.turn_seq)) {
             const expected=contextEnvelope?.conversation?.last_applied_turn_seq;
             const expectedFilter=Number.isInteger(expected)
@@ -5159,7 +5503,10 @@ interpreterClarification =
               search_query:primaSearchRequest.query,
               conversation_move:contextEnvelope?.luna_decision_v12?.conversation_move===
                 "refinement" ? "refinement" : null,
-              changes:pendingChanges
+              changes:pendingChanges,
+              // Only one server-owned checkpoint for this logical plan.
+              // Avoid copying the full user message, JSON payload or cards.
+              compound_compare_v1:compoundCompareCheckpointV1
             };
             try {
               const checkpointRows=await supabaseUpdateReturning(env,"conversations",
@@ -5168,11 +5515,28 @@ interpreterClarification =
               pendingStateSavedV12=Array.isArray(checkpointRows) && checkpointRows.length>0;
               if(!pendingStateSavedV12) console.warn("prima_v12_pending_state_checkpoint_conflict");
             } catch {
-              // Search can still proceed; never expose DB details.
+              // Fail closed below; never expose DB details.
               pendingStateSavedV12=false;
               console.warn("prima_v12_pending_state_checkpoint_failed");
             }
             }
+          }
+          // R2.10: a Search tool request is a separate round trip. If Luna
+          // changed durable client constraints, do not dispatch Search unless
+          // the exact-turn server-owned checkpoint was acknowledged. Failing
+          // closed prevents a successful-looking search with lost refinements.
+          if ((pendingChanges.length > 0 || compoundCompareCheckpointV1) &&
+              pendingStateSavedV12 !== true) {
+            if (d0Trace) {
+              d0Trace.executor = "none";
+              d0Trace.checkpoint = "failed";
+              d0Emit("semantic_checkpoint_unavailable");
+            }
+            return json({
+              ok:false,
+              error:"semantic_checkpoint_unavailable",
+              retryable:true
+            }, 409);
           }
           if (d0Trace) {
             d0Trace.executor = "prima_search";
@@ -5180,6 +5544,13 @@ interpreterClarification =
               pendingStateSavedV12 === false ? "failed" : "not_required";
             d0Emit("tool_request");
           }
+          qaEmit("task_execution", {module:"src/index.js",fn:"fetch",
+            mode:r22TaskPlan.mode,comparison_completion:
+              r22TaskPlan.mode === "compare_and_search" ? "pending" : "not_applicable"});
+          qaEmit("search_dispatch", {module:"src/prima-search-request.js",
+            fn:"buildPrimaSearchRequest",executor:"prima_search",
+            checkpoint:pendingStateSavedV12 === true ? "saved" :
+              pendingStateSavedV12 === false ? "failed" : "not_required"});
           return json({
             ...primaSearchRequest,
 
@@ -5205,6 +5576,11 @@ interpreterClarification =
               used_search:
                 false,
               state_checkpoint_saved_v12:pendingStateSavedV12,
+              typed_task_plan_v1: compoundCompareCheckpointV1
+                ? {version:"TypedTaskPlanV1",mode:r22TaskPlan.mode,
+                   required_routes:r22TaskPlan.tasks.map(task=>task.route),
+                   comparison_completion:"pending",
+                   server_checkpoint_saved:pendingStateSavedV12 === true} : null,
               persona_a1_total_tokens: personaA1?.usage?.total_tokens ?? null,
               persona_a1_usage_unknown: Boolean(personaA1?.usage_unknown),
               total_openai_tokens: personaA1?.usage?.total_tokens ?? 0,
@@ -5245,6 +5621,10 @@ interpreterClarification =
             )
           );
 
+        qaEmit("knowledge_plan", {module:"src/knowledge.js",fn:"resolveKnowledge",
+          needs_knowledge:Boolean(needsKnowledge),
+          needs_search_knowledge:Boolean(needsSearchKnowledge),
+          has_search_results:contextEnvelope?.search?.state === "results"});
         const knowledgeTask =
           needsKnowledge
             ? resolveKnowledge(
@@ -5376,8 +5756,62 @@ interpreterClarification =
         // P0: authorization check before Funnel AND ContactCapture. A model's
         // contact_intent classification alone is not consent. Persona does not
         // run commercial invitations by default; genuine handoffs still work.
-        const p0Consent = inspectPersonaContactConsentV1({
-          message, route, activeMemory
+        const p0ConsentRaw = inspectPersonaContactConsentV1({
+          message, route, activeMemory,
+          semanticCommercialIntent: personaA1?.interpretation?.commercial_signal?.intent || "none"
+        });
+        // PT11: prior explicit deferral prevents an earlier funnel state from
+        // silently re-authorizing a send. This can only REMOVE permission.
+        const pt11DeferredHold = hasDeferredViewingHoldPT11({
+          message, recentMessages:contextEnvelope?.conversation?.recent_messages
+        });
+        const p0Consent = pt06NoAdvisorOffer
+          ? {...p0ConsentRaw, consent:false, explicitRequest:false,
+             refusal:true, suppress:true, permissionDenied:true}
+          : pt11DeferredHold
+            ? {...p0ConsentRaw,consent:false,explicitRequest:false,
+               suppress:true,permissionDenied:true}
+            : p0ConsentRaw;
+        // FIX39-A: preserve the independent semantic task selected by
+        // the existing Interpreter and Decision Policy. Consent refusal
+        // restricts contact authorization, not answer ownership.
+        const p0StructuredIndependentTask = Boolean(
+          p0Consent.refusal &&
+          resolvedInterpretation?.version === "RequestInterpreterV1" &&
+          Number(resolvedInterpretation?.overall_confidence || 0) >= 0.7 &&
+          ["KNOWLEDGE_QA", "ADVISORY", "EXACT_FACT", "COMPARE"].includes(nextAction?.action) &&
+          Array.isArray(resolvedInterpretation?.tasks) &&
+          resolvedInterpretation.tasks.some(task =>
+            task?.needs_clarification !== true &&
+            ["market_question", "page_question", "recommendation", "compare", "exact_fact"].includes(task?.route) &&
+            ((Array.isArray(task?.topics) && task.topics.length > 0) ||
+             (Array.isArray(task?.requested_facts) && task.requested_facts.length > 0))
+          )
+        );
+
+        // FIX39-02A: a confirmed comparison belongs to Answer, not Funnel.
+        // Reuse existing Router + Decision Policy; never authorize contact.
+        const p0PolicyIndependentTask = Boolean(
+          !interpreterClarification &&
+          route === "compare" &&
+          nextAction?.action === "COMPARE"
+        );
+
+        const p0HasOtherTaskV4 = p0Consent.hasOtherTask ||
+          p0StructuredIndependentTask ||
+          p0PolicyIndependentTask ||
+          hasIndependentInformationalQuestionV2(message) ||
+          hasIndependentInformationalImperativeV4(message) ||
+          isConceptualBuyerComparisonFix01V3({message, route, interpretation:resolvedInterpretation}) ||
+          Boolean(classifyOptOutIndependentKnowledgeV8(message));
+
+        qaEmit("consent_answer_ownership", {
+          module:"src/index.js",
+          fn:"consent_answer_ownership",
+          opted_out:Boolean(p0Consent.refusal),
+          semantic_task:p0StructuredIndependentTask,
+          independent_task:Boolean(p0HasOtherTaskV4),
+          action:nextAction?.action || null
         });
         const p0EmptyFunnelDecision = () => ({
           response_type: null, answer_override: null,
@@ -5385,7 +5819,7 @@ interpreterClarification =
         });
         const p0OptOutDecision = () => ({
           response_type: "answer",
-          answer_override: p0Consent.hasOtherTask ? null :
+          answer_override: p0HasOtherTaskV4 ? null :
             "Understood. I won't suggest contacting a specialist unless you ask. We can continue here.",
           follow_up: null, lead_action: null,
           memory_facts: [{
@@ -5397,7 +5831,9 @@ interpreterClarification =
             confidence: 0.99
           }]
         });
-        const p0RawFunnelDecision = p0Consent.refusal
+        const p0RawFunnelDecision = p0Consent.informationalContact
+          ? p0EmptyFunnelDecision()
+          : p0Consent.refusal
           ? p0OptOutDecision()
           : p0Consent.suppress
             ? p0EmptyFunnelDecision()
@@ -5415,12 +5851,21 @@ interpreterClarification =
 
         // H28: personalize ONLY an authorized direct-contact request.
         // Keep G26/Funnel unchanged and preserve the selected channel in Memory.
-        const funnelDecision = presentContactHandoffH28({
+        const presentedFunnelDecision = presentContactHandoffH28({
           message, route, consent: p0Consent,
           decision: h28AuthorizedFunnelDecision,
           activeMemory, currentFacts: extractedFacts,
           preferredChannel: h29Direct.direct_request ? h29Direct.preferred_channel : null
         });
+        // An opt-out can coexist with a genuine property question. Preserve
+        // refusal and memory state, but do not let the acknowledgement become
+        // the entire answer. Only existing ADVISORY / KNOWLEDGE_QA actions qualify.
+        const funnelDecision = shouldPrioritizeIndependentAnswerOverFunnelV2({
+          hasOtherTask: p0HasOtherTaskV4,
+          consent: p0Consent.consent,
+          action: nextAction?.action,
+          decision: presentedFunnelDecision
+        }) ? {...presentedFunnelDecision, answer_override: null} : presentedFunnelDecision;
 
         if (
           funnelDecision
@@ -5528,6 +5973,10 @@ interpreterClarification =
           });
 
         if (f213Recommendation) evidencePack.f213_recommendation = f213Recommendation;
+        qaEmit("evidence", {module:"src/evidence-pack.js",fn:"buildEvidencePack",
+          source_count:Number(evidencePack?.meta?.source_count || 0),
+          has_knowledge:Boolean(knowledgePack),
+          has_search_results:contextEnvelope?.search?.state === "results"});
 
         // F24_RECOMMENDATION_CRITERIA_WORKER_HANDOFF_V1
         // F analyzes. C retains dialogue control.
@@ -5590,6 +6039,69 @@ interpreterClarification =
             );
         }
 
+        // R2.2 B2: the authenticated continuation can render verified Search
+        // cards AND a separately generated comparison. A missing model answer
+        // must NEVER be represented as a completed comparison.
+        let r22B2Comparison = null;
+        let r22B2ComparisonAttempted = false;
+        let r22B2ModelResult = null;
+        if (completedCompareSearchContinuationV1 &&
+            !hasExplicitNoSearchV1(message) &&
+            searchRouteResponse?.response_type === "search_results" &&
+            Array.isArray(searchRouteResponse.cards) &&
+            contextEnvelope?.search?.version === "SearchContextV1") {
+          const r22B2Evidence = prepareVerifiedCompoundComparisonV1({
+            message,
+            evidencePack,
+            search:contextEnvelope.search,
+            cards:searchRouteResponse.cards
+          });
+          if (r22B2Evidence) {
+            r22B2ComparisonAttempted = true;
+            try {
+              const modelResult = await generatePrimaAnswer({
+                env,
+                route:"compare",
+                nextAction:"COMPARE",
+                evidencePack:r22B2Evidence,
+                dialogueContext:buildLunaAnswerContextV12(
+                  answerContextEnvelope, activeMemory),
+                deadlineMs:12000
+              });
+              r22B2ModelResult = modelResult;
+              const merged = combineVerifiedCompoundComparisonV1({
+                comparisonAnswer:modelResult?.answer,
+                searchAnswer:searchRouteResponse.answer,
+                cards:searchRouteResponse.cards
+              });
+              if (merged) {
+                searchRouteResponse.answer = merged;
+                r22B2Comparison = {
+                  status:"generated",
+                  model_latency_ms:modelResult?.latency_ms ?? null,
+                  input_tokens:modelResult?.usage?.input_tokens ?? null,
+                  output_tokens:modelResult?.usage?.output_tokens ?? null
+                };
+              } else {
+                r22B2Comparison = {status:"pending",reason:"composer_no_usable_answer"};
+              }
+            } catch (error) {
+              // No free-form exception text or user data in QA logs.
+              r22B2Comparison = {status:"pending",reason:"composer_exception"};
+            }
+          } else {
+            r22B2Comparison = {status:"pending",reason:"verified_context_unavailable"};
+          }
+          qaEmit("compound_comparison_execution", {module:"src/index.js",fn:"fetch",
+            status:r22B2Comparison?.status || "pending",
+            reason:r22B2Comparison?.reason || null,
+            card_count:searchRouteResponse.cards.length,
+            attempted:r22B2ComparisonAttempted,
+            input_tokens:r22B2Comparison?.input_tokens ?? null,
+            output_tokens:r22B2Comparison?.output_tokens ?? null,
+            latency_ms:r22B2Comparison?.model_latency_ms ?? null});
+        }
+
         // F-V1 LIMITED LOCAL PRESENTATION: no new retrieval/ranking model.
         // Existing Search D returns the actual page. F only describes this
         // verified page, never invents buyer-fit or investment performance.
@@ -5626,8 +6138,126 @@ interpreterClarification =
                 })()
               : null;
 
+        // PT06 — Only an already-established conceptual comparison may
+        // continue after a contact opt-out. This changes answer ownership,
+        // never any Router/Memory/Persona/Search/CRM permissions.
+        const pt06ComparisonContinuation = isContextualComparisonContinuationV6({
+          message, route, action: nextAction?.action, context: contextEnvelope
+        }) && Boolean(p0Consent.refusal);
+
+        // FIX08C — explanatory comparison may use Composer.
+        // Does not authorize CONTACT, SEARCH or unverified facts.
+        const f08cExplanatoryComparison =
+          route === "compare" &&
+          (nextAction?.action === "COMPARE" ||
+            (nextAction?.action === "CLARIFY" &&
+              isConceptualBuyerComparisonFix01V3({message, route, interpretation:resolvedInterpretation}))) &&
+          (
+            isConceptualBuyerComparisonFix01V3({message, route, interpretation:resolvedInterpretation}) ||
+            classifyOptOutIndependentKnowledgeV8(message) === "COMPARE" ||
+            pt06ComparisonContinuation ||
+            isGenericProjectCriteriaComparisonV1(message)
+          );
+
+        // FIX08E: marketing price reliability is conceptual knowledge.
+        // This cannot fetch or confirm an actual unit price.
+        const f08ePriceReliability =
+          route === "exact_fact" &&
+          nextAction?.action === "CLARIFY" &&
+          isMarketingPriceReliabilityQuestionV1(message);
+
+        // FIX39-06: buyer-purpose/category context is not a named property.
+        // A CLARIFY action can still provide useful GENERAL guidance before
+        // asking for missing buyer preferences. Do not reinterpret Search,
+        // Contact, project-specific facts, named projects or developers.
+        const p06SemanticTask = personaA1?.interpretation?.tasks?.length === 1
+          ? personaA1.interpretation.tasks[0] : null;
+        const p06Entities = Array.isArray(personaA1?.interpretation?.entities)
+          ? personaA1.interpretation.entities : [];
+        const p06GenericAdvisoryClarification = Boolean(
+          turn?.phase === "initial" &&
+          route === "recommendation" &&
+          nextAction?.action === "CLARIFY" &&
+          personaA1?.decision === "route" &&
+          personaA1?.interpretation?.primary_route === "recommendation" &&
+          p06SemanticTask?.route === "recommendation" &&
+          p06Entities.length > 0 &&
+          p06Entities.every(entity =>
+            ["buyer_scenario", "origin", "property_type"].includes(entity?.type)) &&
+          ["not_found", "ambiguous"].includes(entityResolution?.status) &&
+          !p0Consent?.consent && !p0Consent?.refusal &&
+          !contactDecision?.captured && !contactDecision?.answer_override &&
+          !searchRouteResponse &&
+          !f213Recommendation
+        );
+        if (p06GenericAdvisoryClarification) {
+          // Old Registry failure is not a valid answer to a buyer-fit question.
+          // Policy still owns CLARIFY, so no commercial capability is unlocked.
+          interpreterClarification = null;
+        }
+        qaEmit("fix39_06_advisory_answer_ownership", {
+          module: "src/index.js", fn: "fix39_06_advisory_answer_ownership",
+          eligible: p06GenericAdvisoryClarification,
+          route, action: nextAction?.action || null
+        });
+
+        // PT-03: an optional district/buyer context must not make a local
+        // identity-error template override a correctly selected answer task.
+        const optionalContextualEntity =
+          ["not_found", "ambiguous"].includes(entityResolution?.status) &&
+          !requiresNamedEntityClarificationV1({
+            action: nextAction?.action,
+            interpretation: resolvedInterpretation,
+            resolution: entityResolution,
+            message
+          });
+        // PT10/PT11: local, evidence-bounded response ownership only.
+        // Memory writes, Registry, Search, and contact gates are unchanged.
+        const pt10AnswerCandidate = recoverBudgetChangeAnswerPT10({
+          message, language:contextEnvelope?.page?.language_code,
+          priorFacts:lunaStoredMemoryV12, currentFacts:extractedFacts,
+          action:nextAction?.action, authorizedContact:Boolean(p0Consent?.consent),
+          searchPending:Boolean(searchRouteResponse)
+        });
+        const pt11AnswerCandidate = recoverDeferredViewingAnswerPT11({
+          message, language:contextEnvelope?.page?.language_code,
+          recentMessages:contextEnvelope?.conversation?.recent_messages,
+          activeFacts:activeMemory, action:nextAction?.action,
+          authorizedContact:Boolean(p0Consent?.consent),
+          searchPending:Boolean(searchRouteResponse),
+          contactCaptured:Boolean(contactDecision?.captured),
+          leadPending:Boolean(funnelDecision?.lead_action)
+        });
+        const pt10Pt11Answer =
+          !contactDecision?.answer_override && !funnelDecision?.answer_override &&
+          !funnelDecision?.lead_action &&
+          (pt10AnswerCandidate || pt11AnswerCandidate)
+            ? (pt10AnswerCandidate || pt11AnswerCandidate).answer : null;
+        if (pt10Pt11Answer) interpreterClarification = null;
+        qaEmit('pt10_pt11_answer_ownership', {
+          module:'src/index.js',fn:'pt10_pt11_answer_ownership',
+          pt10:Boolean(pt10AnswerCandidate),pt11:Boolean(pt11AnswerCandidate),
+          selected:Boolean(pt10Pt11Answer)
+        });
+
+        // PT08: only a contextual, post-policy Registry name-miss can be
+        // answered directly. Exact project/unit facts, real Search/Contact,
+        // ambiguous identities and all authorized side effects stay gated.
+        const pt08ContextAnswerCandidate = recoverContextualAnswerPT08({
+          message, action: nextAction?.action,
+          resolution: entityResolution,
+          clarification: interpreterClarification
+        });
+        const pt08ContextAnswer =
+          pt08ContextAnswerCandidate &&
+          !searchRouteResponse &&
+          !contactDecision?.captured && !contactDecision?.answer_override &&
+          !funnelDecision?.lead_action && !funnelDecision?.answer_override
+            ? pt08ContextAnswerCandidate.answer : null;
+        if (pt08ContextAnswer) interpreterClarification = null;
         const localAnswer =
-          nextAction?.action === "MEMORY_RECALL" ? null :
+          pt10Pt11Answer || pt08ContextAnswer ||
+          (nextAction?.action === "MEMORY_RECALL" ? null :
           ["PAGE_MORE", "RESUME_SEARCH"].includes(nextAction?.action)
             ? "I can't access a valid previous result batch in this conversation. We can start a new search if you'd like."
             : (personaA1?.decision === "answer" ||
@@ -5658,8 +6288,17 @@ interpreterClarification =
                   ?.answer ||
                 searchRouteResponse
                   ?.answer ||
-                interpreterClarification ||
-                buildLocalRouteAnswer({
+                (optionalContextualEntity ? null : interpreterClarification) ||
+                // Market-question was historically a no-live-statistics guard.
+                // When DecisionPolicy explicitly selects an informational or
+                // advisory answer, the guard cannot preempt the shared Composer.
+                // Factual grounding remains in the existing Composer contract.
+                (shouldDeferMarketFallbackToComposerV2({
+                  route, action: nextAction?.action
+                }) || (optionalContextualEntity &&
+                  ["COMPARE", "KNOWLEDGE_QA", "ADVISORY"].includes(nextAction?.action) &&
+                  ["compare", "page_question", "market_question", "recommendation"].includes(route))
+                  ? null : buildLocalRouteAnswer({
                   route,
                   message,
                   personaIntent:
@@ -5669,8 +6308,8 @@ interpreterClarification =
                   knowledgePack,
                   context:
                     answerContextEnvelope
-                })
-              );
+                }))
+              ));
 
         const structuredAnswer =
           nextAction?.action !== "MEMORY_RECALL" &&
@@ -5727,34 +6366,62 @@ interpreterClarification =
         const d1ConversationalAction =
           turn?.phase === "initial" &&
           ["ADVISORY", "CLARIFY", "KNOWLEDGE_QA", "MEMORY_RECALL"].includes(nextAction?.action) &&
-          ["recommendation", "follow_up", "persona_question", "page_question", "market_question"].includes(route) &&
-          !interpreterClarification && !entityResolution?.status?.match?.(/^(?:ambiguous|not_found)$/);
+          (["recommendation", "follow_up", "persona_question", "page_question", "market_question"].includes(route) ||
+            isConceptualBuyerComparisonFix01V3({message, route, interpretation:resolvedInterpretation})) &&
+// FIX09A.1: only a REQUIRED named-entity clarification may block conversational Composer.
+          !interpreterClarification &&
+          (isConceptualBuyerComparisonFix01V3({message, route, interpretation:resolvedInterpretation}) ||
+          !requiresNamedEntityClarificationV1({
+            action: nextAction?.action,
+            interpretation: resolvedInterpretation,
+            resolution: entityResolution,
+            message
+          }));
+        // FIX03: exact-fact classification is not always an entity-fact request.
+        // A narrowly verified metalinguistic definition may use the normal
+        // knowledge Composer without changing Luna or DecisionPolicy routing.
+        // Prices, dates, availability and named-entity facts stay evidence gated.
+        const generalConceptDefinitionV1 = classifyGeneralConceptDefinitionV1({
+          message, route, action: nextAction?.action || null
+        });
+        qaEmit("general_concept_definition_gate", {
+          module:"src/general-concept-definition-v1.js",
+          fn:"classifyGeneralConceptDefinitionV1",
+          eligible:generalConceptDefinitionV1.eligible,
+          reason:generalConceptDefinitionV1.reason
+        });
         const useOpenAI =
+          !buildOptOutResearchAnswerV23(message, { consent:p0Consent.consent }) &&
+          !isBudgetPurchaseCostQuestionV23(message) &&
           !contactDecision
             .answer_override &&
           !funnelDecision
             .answer_override &&
-          !localAnswer &&
-          !structuredAnswer &&
+          (!localAnswer || f08cExplanatoryComparison || f08ePriceReliability || p06GenericAdvisoryClarification) &&
+          (!structuredAnswer || f08ePriceReliability || p06GenericAdvisoryClarification) &&
           !verifiedProjectOverview &&
           (
             nextAction?.action ===
               "PROFILE_UPDATE" ||
-            (d1ConversationalAction || f213Recommendation || shouldUseOpenAI({
-              route,
-              evidencePack,
-              knowledgePack
-            }))
+            (p06GenericAdvisoryClarification || generalConceptDefinitionV1.eligible || f08ePriceReliability || d1ConversationalAction ||
+              f213Recommendation || shouldUseOpenAI({
+                route,
+                evidencePack,
+                knowledgePack
+              }))
           );
 
         const openAIResult =
           useOpenAI
             ? await generatePrimaAnswer({
                 env,
-                route,
-                nextAction:
-                    nextAction?.action ||
-                    null,
+                // Only the Composer receives conceptual semantics; policy
+                // and executor actions are still recorded unchanged.
+                route: (generalConceptDefinitionV1.eligible || f08ePriceReliability)
+                  ? "market_question" : route,
+                nextAction: p06GenericAdvisoryClarification
+                  ? "ADVISORY" : (generalConceptDefinitionV1.eligible || f08ePriceReliability)
+                  ? "KNOWLEDGE_QA" : (nextAction?.action || null),
                   evidencePack,
                   dialogueContext: buildLunaAnswerContextV12(answerContextEnvelope, activeMemory),
                   commercialDirective:
@@ -5781,6 +6448,11 @@ interpreterClarification =
               })
             : null;
 
+        qaEmit("answer_model", {module:"src/openai-reasoning.js",fn:"generatePrimaAnswer",
+          attempted:Boolean(useOpenAI),answered:Boolean(openAIResult?.answer),
+          latency_ms:openAIResult?.latency_ms ?? null,
+          input_tokens:openAIResult?.usage?.input_tokens ?? null,
+          output_tokens:openAIResult?.usage?.output_tokens ?? null});
         // G43_GENERATED_CTA_VALIDATION_V1
         // Existing Funnel text remains a safe fallback.
         const g43GeneratedOffer =
@@ -5814,6 +6486,8 @@ interpreterClarification =
 
           if (d0Trace) {
             d0Trace.final_source = contactDecision?.answer_override ? "contact" :
+              buildOptOutResearchAnswerV23(message, {consent:p0Consent.consent}) ? "r23_optout_research" :
+              isBudgetPurchaseCostQuestionV23(message) ? "r23_budget_costs" :
               funnelDecision?.answer_override ? "funnel" :
               localAnswer ? "local" : structuredAnswer?.answer ? "structured" :
               verifiedProjectOverview ? "verified_overview" :
@@ -5823,9 +6497,73 @@ interpreterClarification =
             d0Trace.final_model_answered = Boolean(openAIResult?.answer);
             d0Trace.evidence_present = Number(evidencePack?.meta?.source_count || 0) > 0;
           }
+          qaEmit("answer_selection", {module:"src/index.js",fn:"answer_selection",
+            source:d0Trace?.final_source || (buildOptOutResearchAnswerV23(message, {consent:p0Consent.consent}) ? "r23_optout_research" :
+              isBudgetPurchaseCostQuestionV23(message) ? "r23_budget_costs" :
+              localAnswer ? "local" :
+              structuredAnswer?.answer ? "structured" :
+              openAIResult?.answer ? "openai_composer" :
+              fallbackAnswer ? "grounded_fallback" : "other"),
+            evidence_present:Number(evidencePack?.meta?.source_count || 0)>0});
+          // R23: opt-out is remembered; an independent research question
+          // still receives an answer. Budget amounts aren't entity names.
+          const r23ResearchAnswer = buildOptOutResearchAnswerV23(message, {
+            consent: p0Consent.consent
+          });
+          const r23BudgetAnswer = isBudgetPurchaseCostQuestionV23(message)
+            ? "When setting a hard Dubai property budget, reserve additional funds for the DLD transfer fee, trustee or registration charges, any broker commission and VAT, and lender/valuation costs if using a mortgage. The DLD transfer fee is commonly 4% of the purchase price, so AED 2 million implies AED 80,000 for that item alone. A rough planning allowance of 6–8% of the property price (AED 120,000–160,000 on AED 2 million) can help avoid exhausting your budget; actual charges depend on the transaction and must be verified with current official schedules and your agent or lender. If AED 2 million is your all-in ceiling, set the purchase-price target below AED 2 million."
+            : null;
+          // FIX06B: a missing target needs an actionable clarification,
+          // not a generic no-data refusal or a category-name lookup.
+          const f06MissingTargetClarification =
+            !pt10Pt11Answer && !contactDecision?.answer_override &&
+            funnelDecision?.lead_action?.type !== "request_contact"
+              ? buildMissingTargetClarificationV1({
+                  message, action: nextAction?.action
+                })
+              : null;
+
+          // FIX39-03: safe clarification for a recognized contact request.
+          // No lead, no contact dispatch, and no inferred authorization.
+          const p0SafeContactClarification =
+            p0UnverifiedSemanticContact &&
+            route === "contact_intent" &&
+            nextAction?.action === "CLARIFY" &&
+            !p0Consent.consent
+              ? "I can help coordinate a property viewing or specialist follow-up. Which property or topic is this about, and what contact method would you prefer? I won't submit a contact request without the necessary details and verified authorization."
+              : null;
+
+          // FIX39-08: conservative answer ownership for methodology and missing identifiers.
+          // No entity validation bypass, data claims, or contact authorization.
+          const p08AnswerRecovery = buildFix39AnswerRecoveryV1({
+            message, route, action: nextAction?.action || null,
+            resolution: entityResolution,
+            interpretation: personaA1?.interpretation || resolvedInterpretation,
+            semanticContact: p0UnverifiedSemanticContact,
+            contactBlocked: Boolean(p0Consent?.refusal || p0Consent?.permissionDenied ||
+              contactDecision?.captured || contactDecision?.answer_override),
+            leadPending: Boolean(funnelDecision?.lead_action)
+          });
+          qaEmit("fix39_08_answer_recovery", {
+            module: "src/index.js", fn: "fix39_08_answer_recovery",
+            applied: Boolean(p08AnswerRecovery), route,
+            action: nextAction?.action || null
+          });
+
           const baseAnswer =
             contactDecision
               .answer_override ||
+            pt10Pt11Answer ||
+            p08AnswerRecovery ||
+            p0SafeContactClarification ||
+            r23ResearchAnswer ||
+            r23BudgetAnswer ||
+            (f08ePriceReliability ? openAIResult?.answer : null) ||
+            (p06GenericAdvisoryClarification ? openAIResult?.answer : null) ||
+            f06MissingTargetClarification ||
+            (f08cExplanatoryComparison
+              ? openAIResult?.answer
+              : null) ||
             funnelDecision
               .answer_override ||
             localAnswer ||
@@ -6069,9 +6807,17 @@ interpreterClarification =
 
         const finalNeedsClarification =
           Boolean(
-            (!f213Recommendation && interpreterClarification) ||
+            f06MissingTargetClarification ||
+            (!f213Recommendation &&
+              !(f08ePriceReliability && openAIResult?.answer) &&
+              interpreterClarification) ||
             (
               route === "compare" &&
+              !(
+                nextAction?.action === "COMPARE" &&
+                (classifyOptOutIndependentKnowledgeV8(message) === "COMPARE" ||
+                 (pt06ComparisonContinuation && Boolean(openAIResult?.answer)))
+              ) &&
               [
                 "ambiguous",
                 "target_missing",
@@ -6396,6 +7142,8 @@ interpreterClarification =
             ?.latency_ms ||
           0;
 
+        response.meta.compound_comparison_composer_latency_ms =
+          r22B2ModelResult?.latency_ms ?? null;
         response.meta.final_openai_latency_ms =
           openAIResult
             ?.latency_ms ||
@@ -6549,6 +7297,32 @@ response.meta.used_search =
               ?.used_search
           );
 
+        // B1 explicitly records the incomplete comparison as incomplete.
+        // Search cards alone MUST NOT be interpreted as a finished comparison.
+        if (completedCompareSearchContinuationV1) {
+          response.meta.compound_comparison_v1 = {
+            version:"CompoundComparisonCompletionV1",
+            search_results_verified:Boolean(completedProjectSearchContinuationV1),
+            comparison_status:r22B2Comparison?.status === "generated" &&
+              response.response_type === "search_results" &&
+              response.answer === searchRouteResponse?.answer
+                ? "generated" : "pending",
+            completion_status:r22B2Comparison?.status === "generated" &&
+              response.response_type === "search_results" &&
+              response.answer === searchRouteResponse?.answer
+                ? "response_assembled" : "partial",
+            content_validation:"not_independently_verified",
+            card_count:Array.isArray(response.cards) ? response.cards.length : 0,
+            model_latency_ms:r22B2Comparison?.model_latency_ms ?? null,
+            model_input_tokens:r22B2Comparison?.input_tokens ?? null,
+            model_output_tokens:r22B2Comparison?.output_tokens ?? null,
+            pending_reason:r22B2Comparison?.reason || null
+          };
+          qaEmit("compound_comparison_finalized", {module:"src/index.js",fn:"fetch",
+            search_results_verified:Boolean(completedProjectSearchContinuationV1),
+            comparison_status:r22B2Comparison?.status || "pending",
+            card_count:Array.isArray(response.cards) ? response.cards.length : 0});
+        }
         response.meta.next_action =
           nextAction?.action ||
           null;
@@ -6598,7 +7372,9 @@ response.meta.used_search =
         // A completed two-pass Search consumes the server-owned pending delta.
         // The final canonical state contains the applied changes, not the checkpoint.
         if(turn?.phase==="tool_continuation" &&
-           dialogueStateForPersistence.pending_semantic_v12) {
+           dialogueStateForPersistence.pending_semantic_v12?.turn_id===turn.turn_id &&
+           dialogueStateForPersistence.pending_semantic_v12?.turn_seq===turn.turn_seq) {
+          // R2.10: never consume a different turn's pending refinements.
           delete dialogueStateForPersistence.pending_semantic_v12;
         }
         // E21: attach only Registry-confirmed identities after C's reducer.
@@ -7104,6 +7880,12 @@ response.meta.used_search =
           d0Trace.used_search = Boolean(responsePayload?.meta?.used_search);
           d0Emit("final_response");
         }
+        qaEmit("final_response", {module:"src/index.js",fn:"fetch",
+          route:qaEnum(route,d0Routes),response_type:qaEnum(responsePayload?.response_type,
+            ["answer","clarification","tool_request","lead_transition","recommendation","search_results","error"]),
+          action:qaEnum(nextAction?.action,d0Actions),
+          used_search:Boolean(responsePayload?.meta?.used_search),
+          worker_ms:responsePayload?.meta?.worker_total_ms ?? null});
         responsePayload.meta.persona_a1_before_model_ms = a1StartedAt === null
           ? null : a1StartedAt - workerTurnStartedAt;
         responsePayload.meta.persona_a1_after_model_ms = a1FinishedAt === null
@@ -7111,6 +7893,16 @@ response.meta.used_search =
         return json(responsePayload);
       } catch (error) {
         console.error(error);
+        // PT07: an upstream DB timeout is not an answer-generation or
+        // persona failure. Never report a successful saved turn when the
+        // server-side commit is unknown. Do not retry state-changing writes.
+        if (String(error?.message || "").includes("supabase_transport_timeout")) {
+          return json({
+            ok: false,
+            error: "service_temporarily_unavailable",
+            message: "I couldn't complete this request reliably. Please try again later."
+          }, 503);
+        }
 
         return json(
           {

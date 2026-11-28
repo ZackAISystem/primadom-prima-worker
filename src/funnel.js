@@ -1,4 +1,5 @@
 import { decideCommercialNextStepV1 } from "./commercial-decision.js";
+import { isInformationalContactInquiryV1 } from "./contact-routing-safety-v1.js";
 function activeFactValue(
   activeMemory,
   factKey
@@ -204,6 +205,8 @@ export function explicitHandoffRequest(
 ) {
   const text =
     String(message).trim();
+
+  if (isInformationalContactInquiryV1(message)) return false;
 
   // P0-05 / N06: 'you can call me Zack' introduces a name. It is NOT
   // an invitation to telephone the user. Preserve explicit requests for
@@ -575,6 +578,8 @@ export function evaluateFunnel({
   interpretation = null,
   commercialContext = null
 } = {}) {
+  // A quoted/negated inquiry is not a commercial handoff or durable opt-out.
+  if (isInformationalContactInquiryV1(message)) return emptyDecision();
   /*
     CTA repetition rules require persistent
     conversation/client state.

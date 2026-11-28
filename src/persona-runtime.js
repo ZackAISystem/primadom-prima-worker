@@ -67,6 +67,15 @@ const RECOMMENDATION_CONCISE_BLOCK = [
   "Never invent project details, investment claims, availability or rankings."
 ].join("\n");
 
+// R2.3 FIX 03 — richer evidence-gated comparisons; no new tools or claims.
+const COMPARE_EVIDENCE_BLOCK = [
+  "CURRENT ACTION: COMPARE. Compare the actual alternatives named by the user, not only generic decision criteria.",
+  "Organize the comparison around each criterion the user explicitly named. For each criterion say what verified evidence distinguishes A from B, or state precisely that the distinction is unverified and what would establish it.",
+  "If verified evidence does not distinguish the choices, do not invent rankings, school names, travel times, or amenities. Still give a useful side-by-side decision framework for both named options, and a conditional recommendation based on the stated priorities.",
+  "For schools, distinguish school catchment/admission, actual school-run travel and transport. For commutes, explain that door-to-door peak-hour times depend on the user's destination; do not fabricate minutes. For long-term family living, assess verified everyday access, amenities, fit and ongoing costs without assuming unprovided facts.",
+  "Avoid a generic disclaimer-only answer. Address all requested comparison dimensions before asking at most one material clarifying question. Never claim either option is better on unverified facts."
+].join("\n");
+
 const ADVISORY_BLOCK = [
   "CURRENT ACTION: ADVISORY. Give the evidence-backed judgment first, then the strongest reasons and main trade-off.",
   "Use known client constraints without assuming missing facts; give a concrete next step only if the user requested it."
@@ -85,6 +94,10 @@ export function buildPersonaInstructions({
   const parts = isPureProfileUpdate
     ? [CORE_PERSONA, PROFILE_UPDATE_BLOCK]
     : [CORE_PERSONA, ANSWER_EXECUTION_BLOCK];
+
+  if (!isPureProfileUpdate && route === "compare" && nextAction !== "PROFILE_UPDATE") {
+    parts.push(COMPARE_EVIDENCE_BLOCK);
+  }
 
   if (!isPureProfileUpdate && nextAction === "ADVISORY") {
     parts.push(ADVISORY_BLOCK);

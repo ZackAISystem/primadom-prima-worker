@@ -1,0 +1,27 @@
+{
+  "contract": "ExistingPrimaKnowledgeV1",
+  "schema": "prima",
+  "registry": "knowledge_registry_v1",
+  "blocks": "knowledge_blocks_v1",
+  "rpc": "existing EN knowledge RPC signatures",
+  "storage_en": "content.page_content_blocks.final_block_json",
+  "storage_non_en": "content.page_content_versions.page_json_final.blocks",
+  "status": "DB adapter pending metadata equivalence audit",
+  "must_preserve": [
+    "block_key",
+    "block_index",
+    "block_family",
+    "final_block_json",
+    "validation_json",
+    "claim_guard_json",
+    "content_version_id",
+    "quality_score",
+    "version_no"
+  ],
+  "must_not": [
+    "rewrite EN RPC",
+    "create new JSON copies",
+    "modify search ranking",
+    "create language-specific database"
+  ]
+}

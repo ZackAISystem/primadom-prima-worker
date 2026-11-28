@@ -1,5 +1,7 @@
 import { recognizeStructuredFactQuestionV1 } from "./fast-gate.js";
+import { isInformationalContactInquiryV1, deniesCurrentContactAuthorizationV1, isDeferredContactSubmissionV1 } from "./contact-routing-safety-v1.js";
 import { isExplicitNameOnlyMessage, isStandaloneGreeting } from "./memory.js";
+import { hasIndependentInformationalQuestionV2, hasIndependentInformationalImperativeV4 } from "./answer-priority-v2.js";
 
 // Narrow, zero-token scope guard for plainly unrelated requests.
 // Ambiguous and mixed requests must continue through the existing semantic path.
@@ -42,6 +44,47 @@ function hasPageContext(context = {}) {
   );
 }
 
+// FIX09C: asking how to prepare for a professional property-transaction
+// discussion is advisory, not a request for the professional to contact the
+// user, and not a request for legal advice or legal conclusions.
+// The subject is assumed to be the buyer's property transaction only if no
+// explicitly unrelated specialty is named. A model must still establish
+// scope and avoid giving definitive professional advice in its answer.
+export function isPropertyProfessionalPreparationV1(message = "") {
+  const q = String(message || "").toLowerCase().replace(/[’]/g, "'").trim();
+  if (!q || q.length > 900) return false;
+  const hasPreparationTask =
+    /\b(?:what|which|how|could you|can you|please|help me|i want to)\b/i.test(q) &&
+    /\b(?:questions?|checklist|prepare|ask|bring|documents?|discuss)\b/i.test(q);
+  const professional = /\b(?:lawyer|solicitor|attorney|conveyancer|notary|legal advis(?:er|or))s?\b/i.test(q);
+  const unrelatedSubject = /\b(?:divorce|custody|criminal|arrest|immigration|visa appeal|employment tribunal|personal injury|medical malpractice|defamation)\b/i.test(q);
+  return hasPreparationTask && professional && !unrelatedSubject;
+}
+
+// PT04 — Information about a property viewing or handoff is not itself
+// permission to send a lead. Read-only context classification, no side effects.
+export function isPropertyHandoffProcessInquiryV1(message = "", context = {}) {
+  const text = String(message || "").replaceAll("’", "'").trim();
+  if (!text || text.length > 1300) return false;
+  if (isDeferredContactSubmissionV1(text)) return true;
+
+  // Explicit information or channel-preference questions about the process.
+  const mentionsProcess = /\b(?:viewing|handoff|whatsapp|appointment|callback|contact details|phone number|agent|advisor|broker|specialist)\b/i.test(text);
+  const asksProcess = /\b(?:what (?:details|information|documents)|what (?:do|would) (?:you|they|the team) need|what (?:you|the team) (?:have|need)|what is missing|what's missing|which details|how (?:does|would|can) (?:it|the process|the team)|(?:can|could|would) you confirm|before (?:sending|submitting|sharing)|until i (?:approve|confirm))\b/i.test(text);
+  if (mentionsProcess && asksProcess) return true;
+
+  // Short follow-up: require an explicit reference back to the team/process.
+  // Generic new-topic questions (e.g. cooking) must not inherit handoff context.
+  const refersBack = /\b(?:the team|they|their|you|your|that|it|this|request|process|handoff|viewing)\b/i.test(text);
+  if (!asksProcess || !refersBack) return false;
+  const history = Array.isArray(context?.conversation?.recent_messages)
+    ? context.conversation.recent_messages.slice(-8) : [];
+  return history.some(item =>
+    item?.role === "user" &&
+    /\b(?:viewing|viewings|visit(?:ing)? (?:the )?(?:unit|property)|agent|broker|property specialist|arrange a call|contact the team|handoff)\b/i.test(String(item?.content || ""))
+  );
+}
+
 export function routeIntent(
   message = "",
   context = {}
@@ -52,6 +95,13 @@ export function routeIntent(
   if (!q) {
     return "unsupported";
   }
+  // A question ABOUT contact (with an explicit no-contact instruction)
+  // is informational; never mistake quoted or negated contact for consent.
+  if (isInformationalContactInquiryV1(raw)) return "market_question";
+  // Prepare / review is allowed; sending a lead remains explicitly forbidden.
+  if (isDeferredContactSubmissionV1(raw)) return "market_question";
+
+  if (isPropertyHandoffProcessInquiryV1(raw, context)) return "market_question";
 
   // Routing is intentionally a coarse, zero-token gate, not the semantic
   // owner. Keep high-confidence ACTIONS distinct from mere topic words.
@@ -65,8 +115,12 @@ export function routeIntent(
   const explicitRecommendationAction =
     /\b(?:recommend|suggest|shortlist)\b/i.test(q) &&
     /\b(?:projects?|properties|apartments?|villas?|homes?|developers?|districts?|areas|communities|neighbou?rhoods)\b/i.test(q);
+  // FIX09C: use the existing, consent-aware denial guard. In particular,
+  // "do not message me" is a refusal, never a CONTACT authorization.
+  // Preserve legacy guard coverage for indirect opt-outs.
   const contactRefusal =
-    /\b(?:do not|don't|dont|never|without|stop|no)\b[\s\S]{0,85}\b(?:contact|call|reach|whatsapp|agent|advisor|broker|specialist|viewing)\b/i.test(q);
+    deniesCurrentContactAuthorizationV1(raw) ||
+    /\b(?:do not|don't|dont|never|without|stop|no)\b[\s\S]{0,85}\b(?:contact|calls?|reach|whatsapp|agent|advisor|broker|specialist|viewing)\b/i.test(q);
   // Personal naming is not a request to telephone the user. The coarse
   // route gate does not create or memorize a name; Persona/Memory owns that.
   // Restrict this exclusion to address-as-name grammar, not any phrase
@@ -224,10 +278,25 @@ export function routeIntent(
     return "persona_question";
   }
 
+  // FIX09C: an independent professional-preparation question must survive
+  // a contact refusal. The returned route is informational only; Contact,
+  // Search, consent, and exact-fact execution remain under existing gates.
+  if (isPropertyProfessionalPreparationV1(raw) &&
+      !explicitPropertyDiscovery && !explicitComparison &&
+      !explicitRecommendationAction) {
+    return "market_question";
+  }
+
   // A negation or passive mention does not authorize Contact.
   // Genuine opt-out state continues to be enforced by Funnel downstream.
+  // Consent remains enforced by Funnel. Preserve independent questions
+  // using the already-approved FIX09B classifier, not a new contact policy.
+  const independentPropertyInformation =
+    (hasIndependentInformationalQuestionV2(raw) ||
+     hasIndependentInformationalImperativeV4(raw)) &&
+    /\b(?:real estate|properties|property|projects?|apartments?|villas?|buy|buying|purchase|mortgage|rental|rent|fees?|districts?|developers?|dubai|uae)\b/i.test(q);
   if (contactRefusal && !explicitPropertyDiscovery && !explicitComparison &&
-      !explicitRecommendationAction) {
+      !explicitRecommendationAction && !independentPropertyInformation) {
     return "unsupported";
   }
   if (explicitContactRequest && !explicitPropertyDiscovery && !explicitComparison &&

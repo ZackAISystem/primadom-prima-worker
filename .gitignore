@@ -4,3 +4,23 @@ node_modules/
 .env.*
 .wrangler/
 .DS_Store
+
+# PRIMA local artifacts and secrets
+/backups/
+/qa/full-pipeline/reports/
+/qa/full-pipeline/.generated-live-trace/
+/wrangler.function-trace.local.jsonc
+/src/.d4-registry-probe-*.js
+/src/*.bak_*
+/src/*.backup-*
+/README-R*.txt
+.dev.vars*
+*.log
+*.pem
+
+# Historical QA snapshots
+/qa/**/backups/
+/qa/**/rollback-*/
+/qa/**/*.bak-*
+__pycache__/
+*.py[cod]

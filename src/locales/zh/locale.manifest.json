@@ -1,0 +1,26 @@
+{
+  "version": "PrimaLocaleManifestV1",
+  "code": "zh",
+  "bcp47": "zh-CN",
+  "native_name": "简体中文",
+  "direction": "ltr",
+  "frontend_path": "/zh/",
+  "language_locked_per_conversation": true,
+  "canonical_entities": "prima.knowledge_registry_v1",
+  "content_source": "content.page_content_versions.page_json_final for translations; EN retained current view",
+  "knowledge_rpc": "existing prima RPC unchanged",
+  "search_engine": "existing Search V3; no search fork",
+  "is_enabled": false,
+  "rollout_status": "scaffold_only_not_translated",
+  "api_origin": null,
+  "search_bridge_origin": null,
+  "requires_before_enable": [
+    "translation_qa_95_plus",
+    "entity_registry_coverage",
+    "knowledge_rpc_parity",
+    "search_d3_d4_d5_e2e",
+    "memory_funnel_lead_e2e",
+    "en_regression",
+    "frontend_and_api_live_smoke"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "version": "PRIMA_R22_PHASE_B1",
+  "files": {
+    "src/index.js": {
+      "before_sha256": "095815a17124d2db04e559ee492350d81157ee99c975bee6acca4643fffaabf4",
+      "after_sha256": "1b7bcb2031be26f2e4448914d43bc6cc42b231acb5666e5fdb33c9e495897dcb"
+    }
+  },
+  "scope": "server-owned checkpoint and continuation diagnostics only; no comparison generation or UI change"
+}

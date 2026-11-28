@@ -1,0 +1,14 @@
+{
+  "version": "PRIMA_R22_PHASE_B2",
+  "scope": "verified Search V3 continuation comparison answer + existing project cards; no frontend modification, no live database",
+  "files": {
+    "src/index.js": {
+      "before_sha256": "1b7bcb2031be26f2e4448914d43bc6cc42b231acb5666e5fdb33c9e495897dcb",
+      "after_sha256": "5e0d8308c2bd8895613a6460a1c2a9c52a6764176958dacc06fe6c7fa5418257"
+    },
+    "src/compound-comparison-v1.js": {
+      "before_sha256": null,
+      "after_sha256": "c8afe8d98aa1c9ea91db8ae4173c77cbf41efd568413f548a0de9cc234c8da3d"
+    }
+  }
+}

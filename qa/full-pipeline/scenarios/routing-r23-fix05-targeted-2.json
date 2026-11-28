@@ -1,0 +1,37 @@
+{
+  "scenarios": [
+    {
+      "id": "S04",
+      "category": "developer_overview",
+      "message": "Tell me about Sobha Realty as a developer and what a buyer should evaluate before choosing one of its projects.",
+      "expected_actions": [
+        "KNOWLEDGE_QA",
+        "ADVISORY",
+        "EXACT_FACT"
+      ],
+      "expected_routes": [
+        "market_question",
+        "page_question",
+        "exact_fact"
+      ],
+      "must_not_actions": [
+        "CONTACT"
+      ]
+    },
+    {
+      "id": "S18",
+      "group": "contact_consent",
+      "category": "conditional_contact_not_now",
+      "message": "Maybe I will speak with an agent next month, but I do not want any calls or messages now. What can I research first?",
+      "expected_actions": [
+        "KNOWLEDGE_QA",
+        "ADVISORY",
+        "CLARIFY"
+      ],
+      "expected_routes": [],
+      "must_not_actions": [
+        "CONTACT"
+      ]
+    }
+  ]
+}

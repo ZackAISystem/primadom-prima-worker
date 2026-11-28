@@ -1,0 +1,77 @@
+{
+  "version": "PrimaFullPipelineTraceV1",
+  "purpose": "Trace actual decisions and execution across Prima Worker",
+  "modes": [
+    "routing-only",
+    "execution",
+    "full-pipeline"
+  ],
+  "identity": [
+    "test_run_id",
+    "scenario_id",
+    "trace_id",
+    "conversation_id",
+    "turn_id",
+    "turn_seq"
+  ],
+  "event_fields": [
+    "sequence",
+    "stage",
+    "module",
+    "function",
+    "status",
+    "started_at",
+    "duration_ms",
+    "input_summary",
+    "output_summary",
+    "reason",
+    "error_code"
+  ],
+  "routing_fields": [
+    "router_route",
+    "fast_gate_decision",
+    "interpreter_route",
+    "luna_primary_route",
+    "luna_tasks",
+    "luna_confidence",
+    "conversation_move",
+    "state_changes",
+    "policy_candidate",
+    "final_next_action",
+    "final_route",
+    "policy_reason"
+  ],
+  "execution_fields": [
+    "executor",
+    "tool_request",
+    "knowledge_status",
+    "search_status",
+    "evidence_status",
+    "reasoning_status",
+    "fallback_reason",
+    "response_type"
+  ],
+  "metrics": [
+    "total_latency_ms",
+    "stage_latency_ms",
+    "openai_calls",
+    "input_tokens",
+    "output_tokens",
+    "total_tokens",
+    "estimated_cost"
+  ],
+  "statuses": [
+    "PASS",
+    "FAIL",
+    "SKIPPED",
+    "BLOCKED",
+    "NOT_TESTED",
+    "UNDETERMINED"
+  ],
+  "privacy": {
+    "log_api_keys": false,
+    "log_raw_contact_data": false,
+    "log_full_dialogue_by_default": false,
+    "production_lead_creation_allowed": false
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "S03": {
+    "original_verdict": "PASS",
+    "luna_action": "KNOWLEDGE_QA",
+    "policy_action": "KNOWLEDGE_QA",
+    "answer": "I don't have verified live Dubai-wide market figures connected right now, so I won't guess current transaction, demand, price-trend or rental data. I can still help you understand the buying process and the questions to verify before making a decision.",
+    "async_status": "COMPLETE",
+    "first_observed_error": null,
+    "http_ms": null
+  },
+  "S14": {
+    "original_verdict": "PASS",
+    "luna_action": "KNOWLEDGE_QA",
+    "policy_action": "KNOWLEDGE_QA",
+    "answer": "I found more than one match for Dubai. Which one do you mean?",
+    "async_status": "COMPLETE",
+    "first_observed_error": null,
+    "http_ms": 6271.86
+  },
+  "S15": {
+    "original_verdict": "REVIEW",
+    "luna_action": "KNOWLEDGE_QA",
+    "policy_action": "CLARIFY",
+    "answer": "That's outside my UAE property specialty. I'm happy to help when you have a real estate question.",
+    "async_status": "COMPLETE",
+    "first_observed_error": null,
+    "http_ms": 6133.64
+  },
+  "S16": {
+    "original_verdict": "FAIL",
+    "luna_action": "ADVISORY",
+    "policy_action": "CONTACT",
+    "answer": "Understood. I won’t suggest contacting a Primadom specialist again unless you ask. We can continue here.",
+    "async_status": "COMPLETE",
+    "first_observed_error": null,
+    "http_ms": 5091.73
+  },
+  "S17": {
+    "original_verdict": "PASS",
+    "luna_action": "KNOWLEDGE_QA",
+    "policy_action": "KNOWLEDGE_QA",
+    "answer": "I found more than one match for Dubai. Which one do you mean?",
+    "async_status": "COMPLETE",
+    "first_observed_error": null,
+    "http_ms": 8309.81
+  },
+  "S18": {
+    "original_verdict": "PASS",
+    "luna_action": "ADVISORY",
+    "policy_action": "ADVISORY",
+    "answer": "Understood. I won’t suggest contacting a Primadom specialist again unless you ask. We can continue here.",
+    "async_status": "COMPLETE",
+    "first_observed_error": null,
+    "http_ms": 5870.38
+  },
+  "S24": {
+    "original_verdict": "FAIL",
+    "luna_action": "ADVISORY",
+    "policy_action": "CLARIFY",
+    "answer": "The main risks of buying off-plan in Dubai are **delivery uncertainty**—the completion date or specifications may change—and **developer or project risk**, including delays or, in more serious cases, failure to complete. You also commit before you can inspect the finished home, and the resale market or value at handover may differ from your expectations. Before committing, review the sale contract, payment milestones, permitted changes and cancellation terms, and independently verify the project’s registration and the developer’s track record.",
+    "async_status": "COMPLETE",
+    "first_observed_error": null,
+    "http_ms": 10763.59
+  },
+  "S26": {
+    "original_verdict": "PASS",
+    "luna_action": "KNOWLEDGE_QA",
+    "policy_action": "KNOWLEDGE_QA",
+    "answer": "I don't have verified live Dubai-wide market figures connected right now, so I won't guess current transaction, demand, price-trend or rental data. I can still help you understand the buying process and the questions to verify before making a decision.",
+    "async_status": "COMPLETE",
+    "first_observed_error": null,
+    "http_ms": 6580.92
+  },
+  "S27": {
+    "original_verdict": "FAIL",
+    "luna_action": "KNOWLEDGE_QA",
+    "policy_action": "CLARIFY",
+    "answer": "That's outside my UAE property specialty. I'm happy to help when you have a real estate question.",
+    "async_status": "COMPLETE",
+    "first_observed_error": null,
+    "http_ms": 9075.51
+  },
+  "S29": {
+    "original_verdict": "PASS",
+    "luna_action": "KNOWLEDGE_QA",
+    "policy_action": "KNOWLEDGE_QA",
+    "answer": "I don't have verified live Dubai-wide market figures connected right now, so I won't guess current transaction, demand, price-trend or rental data. I can still help you understand the buying process and the questions to verify before making a decision.",
+    "async_status": "COMPLETE",
+    "first_observed_error": null,
+    "http_ms": 5485.05
+  }
+}

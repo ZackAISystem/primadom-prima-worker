@@ -594,3 +594,28 @@ export function recognizeConversationMove({
     changed_fields: []
   };
 }
+
+
+// R2.2 — Conversation Move is a continuity signal, not a second semantic
+// decision-maker after Luna has a policy-valid action. Verified references and
+// persisted-thread resumes retain their existing deterministic authority.
+export function routeAfterConversationMoveV12({
+  route,
+  move,
+  lunaActionAccepted = false,
+  hasVerifiedSuspendedThread = false
+} = {}) {
+  const proposed = typeof move?.effective_route === "string"
+    ? move.effective_route : "";
+  if (!proposed) return route;
+  if (!lunaActionAccepted || proposed === route) return proposed;
+  const verifiedReference = move?.move_type === "reference" &&
+    move?.reference?.resolved === true &&
+    ["project", "developer", "district"].includes(move?.reference?.type) &&
+    /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(String(move?.reference?.slug || ""));
+  const verifiedResume = hasVerifiedSuspendedThread &&
+    move?.move_type === "resume" &&
+    move?.reason === "explicit_resume_to_suspended_thread";
+  return verifiedReference || verifiedResume ? proposed : route;
+}
+// END_R22_CONVERSATION_MOVE_AUTHORITY

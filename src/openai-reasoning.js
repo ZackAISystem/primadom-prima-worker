@@ -325,6 +325,20 @@ export async function generatePrimaAnswer({
   if (dialogueContext && typeof dialogueContext === "object") {
     reasoningEvidence.dialogue = dialogueContext;
   }
+  // FIX08D: Explanatory comparison intent belongs to the Composer.
+  // It does not authorize Contact, Search or new factual claims.
+  const f08dQuestion = String(
+    evidencePack?.question ||
+    evidencePack?.request?.message ||
+    evidencePack?.message ||
+    ""
+  );
+
+  const f08dExplainComparison =
+    nextAction === "COMPARE" &&
+    /\b(?:why|reasons?|benefits?|advantages?|purpose)\b/i.test(f08dQuestion) &&
+    /\bcompar(?:e|ing|ison|isons)\b/i.test(f08dQuestion);
+
   const reasoningInput = JSON.stringify(reasoningEvidence);
 
   const controller =
@@ -385,7 +399,10 @@ export async function generatePrimaAnswer({
                   "",
                 evidencePack
               }) +
-              (commercialDirective?.decision === "offer_contact"
+               (f08dExplainComparison
+                 ? `\nEXPLANATORY COMPARISON CONTRACT: Answer the user's WHY-question directly before offering any next step. Explain at least three relevant decision dimensions and their practical tradeoffs: for example, total costs, payment schedules, developer track record, handover risk, location, or suitability. Give conceptual guidance without inventing project-specific facts. Missing project names do not prevent explaining why comparison is useful. Do not merely offer to compare properties or request their names. Respect any refusal of contact; do not suggest calls or collect contact details.`
+                 : "") +
+               (commercialDirective?.decision === "offer_contact"
                 ? `\nAPPROVED FUNNEL OFFER: The Funnel authorizes one optional human specialist offer. Answer the actual question first using verified facts; retain any material uncertainty or risk. Do not invite the user to contact a specialist, advisor, agent or team. The Funnel alone appends a single approved contact invitation. Provide only the substantive answer and any necessary uncertainty. Never request contact details, imply confirmation, invent terms/availability or pressure the user. No generic sales pitch.`
                 : ""
               ),

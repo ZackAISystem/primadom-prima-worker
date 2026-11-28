@@ -1,0 +1,20 @@
+{
+  "contract": "PRIMA_ANSWER_PIPELINE_R2_SAFE_FIX",
+  "date": "2026-11-24",
+  "basis": "PRIMA_R1_REGRESSION_10_RESULTS.zip",
+  "changed_files": {
+    "src/index.js": {
+      "original_sha256": "9aae7624f8873bf7ecf111110bbb16d297147d19b96c74df42e0e15f3c85d09c",
+      "patched_sha256": "38305a8af0181da9979fd3772529f31bb55264f7618da15c2fbb0d38095354e9"
+    }
+  },
+  "new_files": {
+    "src/answer-priority-v2.js": "4333d34d8b497e5af7ec4abe3b64ec4f363e23de3c1d091dbc7ddf76e061ee8b"
+  },
+  "tests": "qa/answer-fix-r2-tests/qa-answer-fix-r2.mjs",
+  "limits": [
+    "No live Composer/DB calls in local static QA",
+    "Full answer relevance and accuracy unverified until real Worker regression",
+    "Baseline must be R1 source SHA"
+  ]
+}

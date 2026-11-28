@@ -1,0 +1,154 @@
+{
+  "version": "PrimaRoutingCoreSuiteV1",
+  "status": "SPECIFICATION_ONLY",
+  "execution_status": "NOT_TESTED",
+  "target": "seven_file_routing_core",
+  "scenario_count": 12,
+  "notes": [
+    "Expectations are proposed acceptance criteria.",
+    "No scenario has been executed by this setup.",
+    "Multi-turn scenarios require stateful isolated conversations.",
+    "Real Luna calls and true runtime traces are required for final acceptance.",
+    "No mocked decisions may be reported as live semantic PASS."
+  ],
+  "scenarios": [
+    {
+      "id": "R01",
+      "category": "property_search",
+      "turns": [
+        "Find 2-bedroom apartments in Dubai Hills under AED 2 million."
+      ],
+      "expected": {
+        "primary_route": "property_search",
+        "next_action": "SEARCH"
+      }
+    },
+    {
+      "id": "R02",
+      "category": "property_search",
+      "turns": [
+        "I'm looking for a two-bedroom home in Dubai Hills, budget AED 2M."
+      ],
+      "expected": {
+        "primary_route": "property_search",
+        "next_action": "SEARCH"
+      }
+    },
+    {
+      "id": "R03",
+      "category": "budget_refinement",
+      "turns": [
+        "Find 2-bedroom apartments in Dubai Hills under AED 2 million.",
+        "Actually, increase the maximum budget to AED 2.5 million."
+      ],
+      "expected": {
+        "second_turn_action": "SEARCH",
+        "preserve_location": true,
+        "preserve_bedrooms": true
+      }
+    },
+    {
+      "id": "R04",
+      "category": "concept_explanation",
+      "turns": [
+        "Explain what rental yield means."
+      ],
+      "expected": {
+        "next_action": "KNOWLEDGE_QA",
+        "search_not_authorized": true
+      }
+    },
+    {
+      "id": "R05",
+      "category": "concept_explanation",
+      "turns": [
+        "What does ROI mean when buying an apartment?"
+      ],
+      "expected": {
+        "next_action": "KNOWLEDGE_QA",
+        "search_not_authorized": true
+      }
+    },
+    {
+      "id": "R06",
+      "category": "developer_overview",
+      "turns": [
+        "Tell me about Emaar as a developer."
+      ],
+      "expected": {
+        "intent": "developer_overview",
+        "not_a_single_structured_fact": true
+      }
+    },
+    {
+      "id": "R07",
+      "category": "developer_exact_fact",
+      "turns": [
+        "Who is the developer of 399 Hills Park?"
+      ],
+      "expected": {
+        "intent": "verified_entity_fact",
+        "search_not_authorized": true
+      }
+    },
+    {
+      "id": "R08",
+      "category": "topic_switch",
+      "turns": [
+        "Find apartments in Dubai Hills under AED 2 million.",
+        "Before we continue, explain what rental yield means."
+      ],
+      "expected": {
+        "second_turn_action": "KNOWLEDGE_QA",
+        "second_turn_search_not_authorized": true
+      }
+    },
+    {
+      "id": "R09",
+      "category": "memory_recall",
+      "turns": [
+        "I'm looking for a 2-bedroom apartment in Dubai Hills under AED 2 million for investment.",
+        "Summarize my property requirements."
+      ],
+      "expected": {
+        "second_turn_action": "MEMORY_RECALL",
+        "preserve_buyer_constraints": true
+      }
+    },
+    {
+      "id": "R10",
+      "category": "compound_request",
+      "turns": [
+        "Tell me about Emaar and show me its projects in Dubai Hills."
+      ],
+      "expected": {
+        "minimum_distinct_tasks": 2,
+        "preserve_all_tasks": true
+      }
+    },
+    {
+      "id": "R11",
+      "category": "contact_safety",
+      "turns": [
+        "Don't contact me or suggest an advisor."
+      ],
+      "expected": {
+        "contact_not_authorized": true,
+        "preserve_opt_out": true
+      }
+    },
+    {
+      "id": "R12",
+      "category": "pagination",
+      "turns": [
+        "Find apartments in Dubai Hills under AED 2 million.",
+        "Show me three more."
+      ],
+      "expected": {
+        "intent": "page_more",
+        "requires_verified_existing_batch": true,
+        "new_search_not_authorized": true
+      }
+    }
+  ]
+}

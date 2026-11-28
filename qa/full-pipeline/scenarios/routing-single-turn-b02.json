@@ -1,0 +1,181 @@
+{
+  "contract": "PRIMA_ROUTING_SINGLE_TURN_B02",
+  "scope": "ONE_INITIAL_MESSAGE_PER_FRESH_CONVERSATION",
+  "scenario_count": 10,
+  "notes": [
+    "Expected route/action hypotheses; ambiguous case judgments require review",
+    "Single-turn context tests are intra-message only, NOT multi-turn memory",
+    "No lead creation consent; contact cases explicitly disallow CONTACT"
+  ],
+  "scenarios": [
+    {
+      "id": "S11",
+      "group": "property_search",
+      "category": "search_studio_jvc",
+      "message": "Find studio apartments in Jumeirah Village Circle for less than AED 900,000.",
+      "expected_actions": [
+        "SEARCH"
+      ],
+      "expected_routes": [
+        "property_search"
+      ],
+      "must_not_actions": [
+        "CONTACT"
+      ]
+    },
+    {
+      "id": "S12",
+      "group": "property_search",
+      "category": "search_ready_business_bay",
+      "message": "Show me ready-to-move-in one-bedroom apartments in Business Bay with a budget of AED 2 million.",
+      "expected_actions": [
+        "SEARCH"
+      ],
+      "expected_routes": [
+        "property_search"
+      ],
+      "must_not_actions": [
+        "CONTACT"
+      ]
+    },
+    {
+      "id": "S13",
+      "group": "property_search",
+      "category": "search_townhouse_family",
+      "message": "Find three-bedroom off-plan townhouses in Dubai under AED 3.5 million, preferably near schools.",
+      "expected_actions": [
+        "SEARCH"
+      ],
+      "expected_routes": [
+        "property_search"
+      ],
+      "must_not_actions": [
+        "CONTACT"
+      ]
+    },
+    {
+      "id": "S14",
+      "group": "information",
+      "category": "property_ownership_explainer",
+      "message": "What is the difference between freehold and leasehold property ownership in Dubai?",
+      "expected_actions": [
+        "KNOWLEDGE_QA",
+        "EXACT_FACT",
+        "ADVISORY"
+      ],
+      "expected_routes": [
+        "market_question",
+        "exact_fact",
+        "page_question",
+        "recommendation"
+      ],
+      "must_not_actions": [
+        "SEARCH",
+        "CONTACT"
+      ]
+    },
+    {
+      "id": "S15",
+      "group": "contact_consent",
+      "category": "contact_process_no_action",
+      "message": "How can I request an agent callback in the future? Do not arrange one now and do not collect my contact details.",
+      "expected_actions": [
+        "KNOWLEDGE_QA",
+        "ADVISORY",
+        "CLARIFY"
+      ],
+      "expected_routes": [],
+      "must_not_actions": [
+        "CONTACT"
+      ]
+    },
+    {
+      "id": "S16",
+      "group": "contact_consent",
+      "category": "request_details_not_consent",
+      "message": "What information would an agent need for a consultation? I am asking for an explanation, not giving permission to contact me.",
+      "expected_actions": [
+        "KNOWLEDGE_QA",
+        "ADVISORY",
+        "CLARIFY"
+      ],
+      "expected_routes": [],
+      "must_not_actions": [
+        "CONTACT"
+      ]
+    },
+    {
+      "id": "S17",
+      "group": "contact_consent",
+      "category": "decline_lead_mortgage",
+      "message": "Do not make a lead or contact me. Just explain how mortgages usually work for property buyers in Dubai.",
+      "expected_actions": [
+        "KNOWLEDGE_QA",
+        "ADVISORY",
+        "CLARIFY"
+      ],
+      "expected_routes": [],
+      "must_not_actions": [
+        "CONTACT",
+        "SEARCH"
+      ]
+    },
+    {
+      "id": "S18",
+      "group": "contact_consent",
+      "category": "conditional_contact_not_now",
+      "message": "Maybe I will speak with an agent next month, but I do not want any calls or messages now. What can I research first?",
+      "expected_actions": [
+        "KNOWLEDGE_QA",
+        "ADVISORY",
+        "CLARIFY"
+      ],
+      "expected_routes": [],
+      "must_not_actions": [
+        "CONTACT"
+      ]
+    },
+    {
+      "id": "S19",
+      "group": "mixed_intents",
+      "category": "search_and_compare",
+      "message": "Compare the benefits of buying a studio versus a one-bedroom apartment for rental income, and find one-bedroom projects in JVC below AED 1.5 million.",
+      "expected_actions": [
+        "SEARCH",
+        "COMPARE",
+        "ADVISORY",
+        "KNOWLEDGE_QA"
+      ],
+      "expected_routes": [
+        "property_search",
+        "compare",
+        "recommendation",
+        "market_question"
+      ],
+      "must_not_actions": [
+        "CONTACT"
+      ],
+      "min_luna_tasks": 2
+    },
+    {
+      "id": "S20",
+      "group": "mixed_intents",
+      "category": "fact_then_search",
+      "message": "Tell me what a payment plan is, and then find off-plan apartments in Dubai Creek Harbour under AED 2.5 million.",
+      "expected_actions": [
+        "SEARCH",
+        "KNOWLEDGE_QA",
+        "ADVISORY"
+      ],
+      "expected_routes": [
+        "property_search",
+        "market_question",
+        "recommendation"
+      ],
+      "must_not_actions": [
+        "CONTACT"
+      ],
+      "min_luna_tasks": 2
+    }
+  ]
+}

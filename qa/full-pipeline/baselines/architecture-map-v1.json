@@ -1,0 +1,5807 @@
+{
+  "version": "PRIMA_ArchitectureMap_V1",
+  "scope": "static_source_analysis",
+  "limitations": [
+    "Static imports are not proof of runtime execution.",
+    "Function detection is approximate, not an AST analysis.",
+    "An unlinked module is not necessarily unused.",
+    "Dynamic call graphs require runtime instrumentation."
+  ],
+  "summary": {
+    "created_at": "2026-11-23T14:27:02.033106+04:00",
+    "source_count": 100,
+    "qa_script_count": 15,
+    "test_count": 1,
+    "total_modules": 116,
+    "identified_functions": 770,
+    "static_dependency_edges": 198,
+    "unresolved_local_imports": 6,
+    "potentially_unlinked_source_modules": 3,
+    "layers": {
+      "qa_script": 15,
+      "other": 26,
+      "memory_context": 10,
+      "search_recommendation": 18,
+      "commercial_safety": 13,
+      "routing_core": 12,
+      "knowledge_entity": 12,
+      "answer": 9,
+      "test": 1
+    }
+  },
+  "modules": [
+    {
+      "path": "scripts/qa-card-facts-v1.mjs",
+      "layer": "qa_script",
+      "lines": 324,
+      "functions": [
+        {
+          "name": "check",
+          "line": 7
+        }
+      ],
+      "exports": [],
+      "imports": [
+        "src/card-facts.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 1
+    },
+    {
+      "path": "scripts/qa-contact-capture-v1.mjs",
+      "layer": "qa_script",
+      "lines": 402,
+      "functions": [
+        {
+          "name": "acceptedMemory",
+          "line": 29
+        },
+        {
+          "name": "check",
+          "line": 6
+        },
+        {
+          "name": "evaluate",
+          "line": 53
+        },
+        {
+          "name": "fact",
+          "line": 16
+        }
+      ],
+      "exports": [],
+      "imports": [
+        "src/contact-capture.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 4
+    },
+    {
+      "path": "scripts/qa-contextual-name-memory.mjs",
+      "layer": "qa_script",
+      "lines": 166,
+      "functions": [
+        {
+          "name": "check",
+          "line": 17
+        },
+        {
+          "name": "factsMap",
+          "line": 7
+        }
+      ],
+      "exports": [],
+      "imports": [
+        "src/memory.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 2
+    },
+    {
+      "path": "scripts/qa-day2-knowledge-adapters.mjs",
+      "layer": "qa_script",
+      "lines": 194,
+      "functions": [
+        {
+          "name": "assert",
+          "line": 25
+        }
+      ],
+      "exports": [],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 1
+    },
+    {
+      "path": "scripts/qa-day2-knowledge-planner.mjs",
+      "layer": "qa_script",
+      "lines": 202,
+      "functions": [
+        {
+          "name": "assert",
+          "line": 6
+        }
+      ],
+      "exports": [],
+      "imports": [
+        "src/knowledge-planner.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 1
+    },
+    {
+      "path": "scripts/qa-decision-persona-bridge.mjs",
+      "layer": "qa_script",
+      "lines": 48,
+      "functions": [],
+      "exports": [],
+      "imports": [
+        "src/decision-policy.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 0
+    },
+    {
+      "path": "scripts/qa-entity-decision-memory.mjs",
+      "layer": "qa_script",
+      "lines": 454,
+      "functions": [
+        {
+          "name": "check",
+          "line": 7
+        },
+        {
+          "name": "factsByKey",
+          "line": 19
+        }
+      ],
+      "exports": [],
+      "imports": [
+        "src/entity-decision-memory.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 2
+    },
+    {
+      "path": "scripts/qa-funnel-v1.mjs",
+      "layer": "qa_script",
+      "lines": 514,
+      "functions": [
+        {
+          "name": "check",
+          "line": 7
+        },
+        {
+          "name": "funnelState",
+          "line": 19
+        },
+        {
+          "name": "stateFrom",
+          "line": 39
+        }
+      ],
+      "exports": [],
+      "imports": [
+        "src/funnel.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 3
+    },
+    {
+      "path": "scripts/qa-memory-v1.mjs",
+      "layer": "qa_script",
+      "lines": 209,
+      "functions": [
+        {
+          "name": "assertEqual",
+          "line": 13
+        },
+        {
+          "name": "assertMissing",
+          "line": 24
+        },
+        {
+          "name": "mapFacts",
+          "line": 3
+        }
+      ],
+      "exports": [],
+      "imports": [
+        "src/memory.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 3
+    },
+    {
+      "path": "scripts/qa-persona-local.mjs",
+      "layer": "qa_script",
+      "lines": 115,
+      "functions": [
+        {
+          "name": "check",
+          "line": 4
+        }
+      ],
+      "exports": [],
+      "imports": [
+        "src/local-responses.js",
+        "src/router.js"
+      ],
+      "static_import_count": 2,
+      "function_count": 1
+    },
+    {
+      "path": "scripts/qa-persona-runtime.mjs",
+      "layer": "qa_script",
+      "lines": 41,
+      "functions": [],
+      "exports": [],
+      "imports": [
+        "src/persona-runtime.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 0
+    },
+    {
+      "path": "scripts/qa-prima-lead-v1.mjs",
+      "layer": "qa_script",
+      "lines": 242,
+      "functions": [
+        {
+          "name": "check",
+          "line": 10
+        }
+      ],
+      "exports": [],
+      "imports": [
+        "src/contact-capture.js",
+        "src/prima-lead.js"
+      ],
+      "static_import_count": 2,
+      "function_count": 1
+    },
+    {
+      "path": "scripts/qa-prima-search-request-v1.mjs",
+      "layer": "qa_script",
+      "lines": 213,
+      "functions": [
+        {
+          "name": "check",
+          "line": 6
+        }
+      ],
+      "exports": [],
+      "imports": [
+        "src/prima-search-request.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 1
+    },
+    {
+      "path": "scripts/qa-search-context-v1.mjs",
+      "layer": "qa_script",
+      "lines": 196,
+      "functions": [
+        {
+          "name": "check",
+          "line": 13
+        }
+      ],
+      "exports": [],
+      "imports": [
+        "src/context.js",
+        "src/evidence-pack.js",
+        "src/search-context.js"
+      ],
+      "static_import_count": 3,
+      "function_count": 1
+    },
+    {
+      "path": "scripts/qa-search-response-v1.mjs",
+      "layer": "qa_script",
+      "lines": 190,
+      "functions": [
+        {
+          "name": "check",
+          "line": 6
+        }
+      ],
+      "exports": [],
+      "imports": [
+        "src/search-response.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 1
+    },
+    {
+      "path": "src/card-facts.js",
+      "layer": "other",
+      "lines": 482,
+      "functions": [
+        {
+          "name": "attachProjectCardFacts",
+          "line": 419
+        },
+        {
+          "name": "buildBundle",
+          "line": 172
+        },
+        {
+          "name": "finalJson",
+          "line": 80
+        },
+        {
+          "name": "keyFact",
+          "line": 113
+        },
+        {
+          "name": "normalizeProjectCardFactsResult",
+          "line": 303
+        },
+        {
+          "name": "projectCardFactsFromSearchKnowledge",
+          "line": 378
+        },
+        {
+          "name": "resolveProjectCardFacts",
+          "line": 322
+        },
+        {
+          "name": "searchSlugs",
+          "line": 26
+        },
+        {
+          "name": "text",
+          "line": 9
+        }
+      ],
+      "exports": [
+        "attachProjectCardFacts",
+        "normalizeProjectCardFactsResult",
+        "projectCardFactsFromSearchKnowledge",
+        "resolveProjectCardFacts"
+      ],
+      "imports": [
+        "src/supabase.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 9
+    },
+    {
+      "path": "src/commercial-context.js",
+      "layer": "memory_context",
+      "lines": 198,
+      "functions": [
+        {
+          "name": "buildCommercialContextV1",
+          "line": 40
+        }
+      ],
+      "exports": [
+        "buildCommercialContextV1"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 1
+    },
+    {
+      "path": "src/commercial-decision.js",
+      "layer": "other",
+      "lines": 205,
+      "functions": [
+        {
+          "name": "decideCommercialNextStepV1",
+          "line": 32
+        },
+        {
+          "name": "hasContact",
+          "line": 20
+        },
+        {
+          "name": "result",
+          "line": 69
+        }
+      ],
+      "exports": [
+        "decideCommercialNextStepV1"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 3
+    },
+    {
+      "path": "src/compare.js",
+      "layer": "search_recommendation",
+      "lines": 120,
+      "functions": [
+        {
+          "name": "cleanSide",
+          "line": 17
+        },
+        {
+          "name": "extractProjectComparisonPair",
+          "line": 31
+        },
+        {
+          "name": "extractProjectComparisonTarget",
+          "line": 65
+        },
+        {
+          "name": "normalizePhrase",
+          "line": 1
+        },
+        {
+          "name": "slugToName",
+          "line": 9
+        }
+      ],
+      "exports": [
+        "extractProjectComparisonPair",
+        "extractProjectComparisonTarget"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 5
+    },
+    {
+      "path": "src/contact-capture.js",
+      "layer": "commercial_safety",
+      "lines": 523,
+      "functions": [
+        {
+          "name": "activeFactValue",
+          "line": 3
+        },
+        {
+          "name": "currentFunnelState",
+          "line": 31
+        },
+        {
+          "name": "emptyDecision",
+          "line": 265
+        },
+        {
+          "name": "evaluateContactCapture",
+          "line": 278
+        },
+        {
+          "name": "explicitContactChannel",
+          "line": 55
+        },
+        {
+          "name": "extractEmail",
+          "line": 194
+        },
+        {
+          "name": "extractPhone",
+          "line": 153
+        },
+        {
+          "name": "hasContactCue",
+          "line": 94
+        },
+        {
+          "name": "hasExplicitVoluntaryContactCue",
+          "line": 88
+        },
+        {
+          "name": "isContactOnlyMessage",
+          "line": 221
+        },
+        {
+          "name": "normalizePhoneCandidate",
+          "line": 108
+        }
+      ],
+      "exports": [
+        "evaluateContactCapture",
+        "hasExplicitVoluntaryContactCue"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 11
+    },
+    {
+      "path": "src/contact-first-turn-intro-h34.js",
+      "layer": "commercial_safety",
+      "lines": 22,
+      "functions": [
+        {
+          "name": "extractH34FirstTurnContactNameFact",
+          "line": 4
+        }
+      ],
+      "exports": [
+        "extractH34FirstTurnContactNameFact"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 1
+    },
+    {
+      "path": "src/contact-handoff-presentation.js",
+      "layer": "commercial_safety",
+      "lines": 70,
+      "functions": [
+        {
+          "name": "latestSafeName",
+          "line": 3
+        },
+        {
+          "name": "presentContactHandoffH28",
+          "line": 31
+        },
+        {
+          "name": "requestedChannel",
+          "line": 18
+        }
+      ],
+      "exports": [
+        "presentContactHandoffH28"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 3
+    },
+    {
+      "path": "src/contact-received-fastpath-i32.js",
+      "layer": "commercial_safety",
+      "lines": 55,
+      "functions": [
+        {
+          "name": "expectedContactOnlyI32",
+          "line": 23
+        },
+        {
+          "name": "lastFactValue",
+          "line": 10
+        }
+      ],
+      "exports": [
+        "expectedContactOnlyI32"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 2
+    },
+    {
+      "path": "src/context.js",
+      "layer": "memory_context",
+      "lines": 441,
+      "functions": [
+        {
+          "name": "buildContextEnvelope",
+          "line": 4
+        },
+        {
+          "name": "buildLocalContextEnvelope",
+          "line": 338
+        },
+        {
+          "name": "hydrateLocalConversationControlState",
+          "line": 184
+        }
+      ],
+      "exports": [
+        "buildContextEnvelope",
+        "buildLocalContextEnvelope",
+        "hydrateLocalConversationControlState"
+      ],
+      "imports": [
+        "src/search-context.js",
+        "src/supabase.js"
+      ],
+      "static_import_count": 2,
+      "function_count": 3
+    },
+    {
+      "path": "src/conversation-access.js",
+      "layer": "memory_context",
+      "lines": 34,
+      "functions": [
+        {
+          "name": "issueConversationAccessToken",
+          "line": 19
+        },
+        {
+          "name": "signatureBytes",
+          "line": 7
+        },
+        {
+          "name": "verifyConversationAccess",
+          "line": 24
+        }
+      ],
+      "exports": [
+        "issueConversationAccessToken",
+        "verifyConversationAccess"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 3
+    },
+    {
+      "path": "src/conversation-move.js",
+      "layer": "routing_core",
+      "lines": 621,
+      "functions": [
+        {
+          "name": "hasExplicitResumeCue",
+          "line": 174
+        },
+        {
+          "name": "hasExplicitSwitchCue",
+          "line": 121
+        },
+        {
+          "name": "looksSelfContainedTurn",
+          "line": 142
+        },
+        {
+          "name": "object",
+          "line": 6
+        },
+        {
+          "name": "recognizeConversationMove",
+          "line": 215
+        },
+        {
+          "name": "requestStateChanges",
+          "line": 43
+        },
+        {
+          "name": "routeAfterConversationMoveV12",
+          "line": 602
+        },
+        {
+          "name": "sameValue",
+          "line": 17
+        },
+        {
+          "name": "suspendedTopic",
+          "line": 193
+        }
+      ],
+      "exports": [
+        "recognizeConversationMove",
+        "routeAfterConversationMoveV12"
+      ],
+      "imports": [
+        "src/follow-up.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 9
+    },
+    {
+      "path": "src/conversation-ordering.js",
+      "layer": "memory_context",
+      "lines": 110,
+      "functions": [
+        {
+          "name": "buildConversationOrderingV1",
+          "line": 32
+        },
+        {
+          "name": "validTurnId",
+          "line": 14
+        },
+        {
+          "name": "validTurnSeq",
+          "line": 1
+        }
+      ],
+      "exports": [
+        "buildConversationOrderingV1"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 3
+    },
+    {
+      "path": "src/conversation-state.js",
+      "layer": "memory_context",
+      "lines": 1264,
+      "functions": [
+        {
+          "name": "activeFacts",
+          "line": 187
+        },
+        {
+          "name": "activeSearchContext",
+          "line": 399
+        },
+        {
+          "name": "applyConversationMoveToStateV1",
+          "line": 1067
+        },
+        {
+          "name": "applyLunaDecisionToContextV12",
+          "line": 73
+        },
+        {
+          "name": "applyLunaSlotsToStateV12",
+          "line": 111
+        },
+        {
+          "name": "buildConversationStateV1",
+          "line": 553
+        },
+        {
+          "name": "cloneStateValue",
+          "line": 927
+        },
+        {
+          "name": "comparisonTarget",
+          "line": 327
+        },
+        {
+          "name": "currentEntity",
+          "line": 283
+        },
+        {
+          "name": "currentSearch",
+          "line": 385
+        },
+        {
+          "name": "latestMessage",
+          "line": 262
+        },
+        {
+          "name": "locate",
+          "line": 134
+        },
+        {
+          "name": "lunaMemoryFactsFromStateChangesV12",
+          "line": 48
+        },
+        {
+          "name": "maskClearedConversationMemoryV12",
+          "line": 59
+        },
+        {
+          "name": "memoryValue",
+          "line": 196
+        },
+        {
+          "name": "normalizeLunaSlotV12",
+          "line": 25
+        },
+        {
+          "name": "numberOrNull",
+          "line": 211
+        },
+        {
+          "name": "persistedState",
+          "line": 231
+        },
+        {
+          "name": "recentMessages",
+          "line": 251
+        },
+        {
+          "name": "refreshConversationStateV1",
+          "line": 1243
+        },
+        {
+          "name": "restoreSuspendedThread",
+          "line": 992
+        },
+        {
+          "name": "searchBedrooms",
+          "line": 481
+        },
+        {
+          "name": "searchBudgetValue",
+          "line": 500
+        },
+        {
+          "name": "searchLocation",
+          "line": 455
+        },
+        {
+          "name": "searchPropertyType",
+          "line": 438
+        },
+        {
+          "name": "snapshotActiveThread",
+          "line": 941
+        },
+        {
+          "name": "threadRoute",
+          "line": 545
+        }
+      ],
+      "exports": [
+        "applyConversationMoveToStateV1",
+        "applyLunaDecisionToContextV12",
+        "buildConversationStateV1",
+        "lunaMemoryFactsFromStateChangesV12",
+        "maskClearedConversationMemoryV12",
+        "refreshConversationStateV1"
+      ],
+      "imports": [
+        "src/compare.js",
+        "src/preferred-location-v1.js"
+      ],
+      "static_import_count": 2,
+      "function_count": 27
+    },
+    {
+      "path": "src/conversation-turn.js",
+      "layer": "memory_context",
+      "lines": 65,
+      "functions": [
+        {
+          "name": "createTurnId",
+          "line": 1
+        },
+        {
+          "name": "normalizeConversationTurn",
+          "line": 18
+        }
+      ],
+      "exports": [
+        "normalizeConversationTurn"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 2
+    },
+    {
+      "path": "src/decision-policy.js",
+      "layer": "routing_core",
+      "lines": 388,
+      "functions": [
+        {
+          "name": "authorizePrimaSearchV12",
+          "line": 279
+        },
+        {
+          "name": "decideNextActionV1",
+          "line": 58
+        },
+        {
+          "name": "finalizeNextActionV12",
+          "line": 294
+        },
+        {
+          "name": "reconcileSemanticRouteV12",
+          "line": 24
+        },
+        {
+          "name": "routeForNextActionV1",
+          "line": 329
+        }
+      ],
+      "exports": [
+        "NEXT_ACTIONS_V1",
+        "authorizePrimaSearchV12",
+        "decideNextActionV1",
+        "finalizeNextActionV12",
+        "reconcileSemanticRouteV12",
+        "routeForNextActionV1"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 5
+    },
+    {
+      "path": "src/developer-discovery-v1.js",
+      "layer": "other",
+      "lines": 147,
+      "functions": [
+        {
+          "name": "discoverDevelopersV1",
+          "line": 37
+        },
+        {
+          "name": "normalize",
+          "line": 4
+        },
+        {
+          "name": "queryTarget",
+          "line": 13
+        },
+        {
+          "name": "title",
+          "line": 8
+        }
+      ],
+      "exports": [
+        "discoverDevelopersV1"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 4
+    },
+    {
+      "path": "src/developer-project-groups-v1.js",
+      "layer": "other",
+      "lines": 131,
+      "functions": [
+        {
+          "name": "groupDeveloperProjectMatchesV1",
+          "line": 11
+        },
+        {
+          "name": "key",
+          "line": 1
+        }
+      ],
+      "exports": [
+        "groupDeveloperProjectMatchesV1"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 2
+    },
+    {
+      "path": "src/developer-search-preview-v1.js",
+      "layer": "search_recommendation",
+      "lines": 366,
+      "functions": [
+        {
+          "name": "fact",
+          "line": 339
+        },
+        {
+          "name": "handleD4DeveloperPreview",
+          "line": 5
+        },
+        {
+          "name": "key",
+          "line": 152
+        }
+      ],
+      "exports": [
+        "handleD4DeveloperPreview"
+      ],
+      "imports": [
+        "src/developer-discovery-v1.js",
+        "src/developer-project-groups-v1.js",
+        "src/supabase.js"
+      ],
+      "static_import_count": 3,
+      "function_count": 3
+    },
+    {
+      "path": "src/direct-contact-intent-h29.js",
+      "layer": "commercial_safety",
+      "lines": 68,
+      "functions": [
+        {
+          "name": "clean",
+          "line": 5
+        },
+        {
+          "name": "inspectDirectContactH29",
+          "line": 9
+        },
+        {
+          "name": "retainDirectContactNameH30",
+          "line": 54
+        }
+      ],
+      "exports": [
+        "inspectDirectContactH29",
+        "retainDirectContactNameH30"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 3
+    },
+    {
+      "path": "src/district-budget-search-v1.js",
+      "layer": "search_recommendation",
+      "lines": 259,
+      "functions": [
+        {
+          "name": "exactPropertyType",
+          "line": 130
+        },
+        {
+          "name": "matchDistrictBudgetProjectV1",
+          "line": 149
+        },
+        {
+          "name": "norm",
+          "line": 9
+        },
+        {
+          "name": "parseDistrictBudgetQueryV1",
+          "line": 55
+        },
+        {
+          "name": "resolveDistrict",
+          "line": 108
+        },
+        {
+          "name": "searchDistrictBudgetV1",
+          "line": 173
+        },
+        {
+          "name": "title",
+          "line": 51
+        }
+      ],
+      "exports": [
+        "matchDistrictBudgetProjectV1",
+        "parseDistrictBudgetQueryV1",
+        "searchDistrictBudgetV1"
+      ],
+      "imports": [
+        "src/district-emirates-v1.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 7
+    },
+    {
+      "path": "src/district-combined-search-v1.js",
+      "layer": "search_recommendation",
+      "lines": 185,
+      "functions": [
+        {
+          "name": "collectPages",
+          "line": 68
+        },
+        {
+          "name": "compact",
+          "line": 25
+        },
+        {
+          "name": "parseDistrictCombinedQueryV1",
+          "line": 28
+        },
+        {
+          "name": "searchDistrictCombinedV1",
+          "line": 104
+        }
+      ],
+      "exports": [
+        "parseDistrictCombinedQueryV1",
+        "searchDistrictCombinedV1"
+      ],
+      "imports": [
+        "src/district-budget-search-v1.js",
+        "src/district-intelligence-search-v1.js"
+      ],
+      "static_import_count": 2,
+      "function_count": 4
+    },
+    {
+      "path": "src/district-developer-search-v1.js",
+      "layer": "search_recommendation",
+      "lines": 370,
+      "functions": [
+        {
+          "name": "collectQualitative",
+          "line": 160
+        },
+        {
+          "name": "developerKey",
+          "line": 25
+        },
+        {
+          "name": "exactProperty",
+          "line": 93
+        },
+        {
+          "name": "matchDistrictDeveloperProjectV1",
+          "line": 113
+        },
+        {
+          "name": "norm",
+          "line": 19
+        },
+        {
+          "name": "parseDistrictDeveloperQueryV1",
+          "line": 185
+        },
+        {
+          "name": "propertyName",
+          "line": 70
+        },
+        {
+          "name": "resolveDistrict",
+          "line": 77
+        },
+        {
+          "name": "searchDistrictDeveloperV1",
+          "line": 278
+        },
+        {
+          "name": "title",
+          "line": 66
+        }
+      ],
+      "exports": [
+        "matchDistrictDeveloperProjectV1",
+        "parseDistrictDeveloperQueryV1",
+        "searchDistrictDeveloperV1"
+      ],
+      "imports": [
+        "src/district-budget-search-v1.js",
+        "src/district-emirates-v1.js",
+        "src/district-intelligence-search-v1.js"
+      ],
+      "static_import_count": 3,
+      "function_count": 10
+    },
+    {
+      "path": "src/district-discovery-v1.js",
+      "layer": "other",
+      "lines": 119,
+      "functions": [
+        {
+          "name": "discoverDistrictsV1",
+          "line": 28
+        },
+        {
+          "name": "display",
+          "line": 13
+        },
+        {
+          "name": "normalize",
+          "line": 8
+        },
+        {
+          "name": "queryTarget",
+          "line": 18
+        }
+      ],
+      "exports": [
+        "discoverDistrictsV1"
+      ],
+      "imports": [
+        "src/district-emirates-v1.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 4
+    },
+    {
+      "path": "src/district-emirates-v1.js",
+      "layer": "other",
+      "lines": 305,
+      "functions": [],
+      "exports": [
+        "DISTRICT_EMIRATES_V1"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 0
+    },
+    {
+      "path": "src/district-intelligence-search-v1.js",
+      "layer": "search_recommendation",
+      "lines": 204,
+      "functions": [
+        {
+          "name": "display",
+          "line": 115
+        },
+        {
+          "name": "getEvidence",
+          "line": 67
+        },
+        {
+          "name": "norm",
+          "line": 11
+        },
+        {
+          "name": "parseDistrictIntelligenceQueryV1",
+          "line": 45
+        },
+        {
+          "name": "searchDistrictIntelligenceV1",
+          "line": 119
+        }
+      ],
+      "exports": [
+        "parseDistrictIntelligenceQueryV1",
+        "searchDistrictIntelligenceV1"
+      ],
+      "imports": [
+        "src/district-emirates-v1.js",
+        "src/district-intelligence-v1.js"
+      ],
+      "static_import_count": 2,
+      "function_count": 5
+    },
+    {
+      "path": "src/district-intelligence-v1.js",
+      "layer": "other",
+      "lines": 4,
+      "functions": [],
+      "exports": [
+        "DISTRICT_INTELLIGENCE_V1"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 0
+    },
+    {
+      "path": "src/district-search-preview-v1.js",
+      "layer": "search_recommendation",
+      "lines": 548,
+      "functions": [
+        {
+          "name": "allowedPhoto",
+          "line": 289
+        },
+        {
+          "name": "body",
+          "line": 241
+        },
+        {
+          "name": "handleD5DistrictPreview",
+          "line": 21
+        },
+        {
+          "name": "norm",
+          "line": 18
+        }
+      ],
+      "exports": [
+        "handleD5DistrictPreview"
+      ],
+      "imports": [
+        "src/district-budget-search-v1.js",
+        "src/district-combined-search-v1.js",
+        "src/district-developer-search-v1.js",
+        "src/district-discovery-v1.js",
+        "src/district-intelligence-search-v1.js",
+        "src/supabase.js"
+      ],
+      "static_import_count": 6,
+      "function_count": 4
+    },
+    {
+      "path": "src/entity-decision-memory.js",
+      "layer": "knowledge_entity",
+      "lines": 591,
+      "functions": [
+        {
+          "name": "currentProject",
+          "line": 38
+        },
+        {
+          "name": "detectDecisionStatus",
+          "line": 234
+        },
+        {
+          "name": "extractEntityDecisionFacts",
+          "line": 496
+        },
+        {
+          "name": "extractExplicitTarget",
+          "line": 316
+        },
+        {
+          "name": "hasEntityDecisionSignal",
+          "line": 281
+        },
+        {
+          "name": "hasExistingDecision",
+          "line": 484
+        },
+        {
+          "name": "isPureEntityDecisionStatementV1",
+          "line": 296
+        },
+        {
+          "name": "messageMentionsProject",
+          "line": 159
+        },
+        {
+          "name": "normalizeComparable",
+          "line": 6
+        },
+        {
+          "name": "projectFromSlug",
+          "line": 17
+        },
+        {
+          "name": "recentMatchingProject",
+          "line": 110
+        },
+        {
+          "name": "recentMentionedProject",
+          "line": 185
+        },
+        {
+          "name": "rejectionReason",
+          "line": 353
+        },
+        {
+          "name": "resolveDecisionProject",
+          "line": 383
+        },
+        {
+          "name": "targetMatchesProject",
+          "line": 79
+        }
+      ],
+      "exports": [
+        "extractEntityDecisionFacts",
+        "hasEntityDecisionSignal",
+        "isPureEntityDecisionStatementV1"
+      ],
+      "imports": [
+        "src/follow-up.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 15
+    },
+    {
+      "path": "src/entity-resolver.js",
+      "layer": "knowledge_entity",
+      "lines": 518,
+      "functions": [
+        {
+          "name": "buildKnowledgeContext",
+          "line": 447
+        },
+        {
+          "name": "fields",
+          "line": 103
+        },
+        {
+          "name": "lookupExact",
+          "line": 116
+        },
+        {
+          "name": "lookupPrefix",
+          "line": 140
+        },
+        {
+          "name": "normalizeSlug",
+          "line": 40
+        },
+        {
+          "name": "primaryEntity",
+          "line": 57
+        },
+        {
+          "name": "resolveNamedEntity",
+          "line": 165
+        }
+      ],
+      "exports": [
+        "buildKnowledgeContext",
+        "resolveNamedEntity"
+      ],
+      "imports": [
+        "src/supabase.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 7
+    },
+    {
+      "path": "src/evidence-pack.js",
+      "layer": "answer",
+      "lines": 839,
+      "functions": [
+        {
+          "name": "buildEvidencePack",
+          "line": 629
+        },
+        {
+          "name": "buildSource",
+          "line": 519
+        },
+        {
+          "name": "collectEvidenceItems",
+          "line": 130
+        },
+        {
+          "name": "collectMissingFields",
+          "line": 300
+        },
+        {
+          "name": "collectVerificationNotes",
+          "line": 361
+        },
+        {
+          "name": "compactBuyerScenario",
+          "line": 600
+        },
+        {
+          "name": "compactRelation",
+          "line": 571
+        },
+        {
+          "name": "compactSourceItems",
+          "line": 480
+        },
+        {
+          "name": "evidencePriority",
+          "line": 47
+        },
+        {
+          "name": "normalizeText",
+          "line": 12
+        },
+        {
+          "name": "pushEvidence",
+          "line": 91
+        },
+        {
+          "name": "shouldSkipKey",
+          "line": 20
+        },
+        {
+          "name": "topicRelevance",
+          "line": 409
+        }
+      ],
+      "exports": [
+        "buildEvidencePack"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 13
+    },
+    {
+      "path": "src/fast-gate.js",
+      "layer": "routing_core",
+      "lines": 937,
+      "functions": [
+        {
+          "name": "cleanDeterministicEntityName",
+          "line": 204
+        },
+        {
+          "name": "currentEntity",
+          "line": 124
+        },
+        {
+          "name": "detectStructuredFactKeysV1",
+          "line": 376
+        },
+        {
+          "name": "detectedExactFacts",
+          "line": 75
+        },
+        {
+          "name": "evaluateFastGate",
+          "line": 447
+        },
+        {
+          "name": "extractDeterministicEntityCandidate",
+          "line": 217
+        },
+        {
+          "name": "hasContactIntent",
+          "line": 100
+        },
+        {
+          "name": "hasPotentialExplicitEntityReference",
+          "line": 143
+        },
+        {
+          "name": "hasResolvedEntity",
+          "line": 110
+        },
+        {
+          "name": "matchesAny",
+          "line": 65
+        },
+        {
+          "name": "recognizeStructuredFactQuestionV1",
+          "line": 380
+        },
+        {
+          "name": "resolveContextualPersonaIntent",
+          "line": 397
+        }
+      ],
+      "exports": [
+        "detectStructuredFactKeysV1",
+        "evaluateFastGate",
+        "extractDeterministicEntityCandidate",
+        "recognizeStructuredFactQuestionV1",
+        "resolveContextualPersonaIntent"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 12
+    },
+    {
+      "path": "src/follow-up.js",
+      "layer": "other",
+      "lines": 376,
+      "functions": [
+        {
+          "name": "currentContextEntity",
+          "line": 175
+        },
+        {
+          "name": "e1CanonicalConversationEntity",
+          "line": 85
+        },
+        {
+          "name": "extractCompareCandidates",
+          "line": 25
+        },
+        {
+          "name": "humanizeSlug",
+          "line": 1
+        },
+        {
+          "name": "latestStoredEntity",
+          "line": 130
+        },
+        {
+          "name": "ordinalIndex",
+          "line": 45
+        },
+        {
+          "name": "recentMessages",
+          "line": 14
+        },
+        {
+          "name": "resolveFollowUpReference",
+          "line": 209
+        }
+      ],
+      "exports": [
+        "resolveFollowUpReference"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 8
+    },
+    {
+      "path": "src/funnel.js",
+      "layer": "commercial_safety",
+      "lines": 1129,
+      "functions": [
+        {
+          "name": "acceptedPreviousOffer",
+          "line": 237
+        },
+        {
+          "name": "activeFactValue",
+          "line": 2
+        },
+        {
+          "name": "candidateOffer",
+          "line": 361
+        },
+        {
+          "name": "canonicalCommercialSignal",
+          "line": 315
+        },
+        {
+          "name": "commercialProgressScore",
+          "line": 30
+        },
+        {
+          "name": "declinedPreviousOffer",
+          "line": 258
+        },
+        {
+          "name": "emptyDecision",
+          "line": 521
+        },
+        {
+          "name": "evaluateFunnel",
+          "line": 570
+        },
+        {
+          "name": "explicitContactOptOut",
+          "line": 187
+        },
+        {
+          "name": "explicitHandoffRequest",
+          "line": 202
+        },
+        {
+          "name": "funnelFact",
+          "line": 505
+        },
+        {
+          "name": "g38TemporaryRefusal",
+          "line": 540
+        },
+        {
+          "name": "hasCanonicalCommercialFact",
+          "line": 288
+        },
+        {
+          "name": "hasImmediateCommercialSignal",
+          "line": 134
+        },
+        {
+          "name": "hasShortlist",
+          "line": 115
+        },
+        {
+          "name": "semanticDirectHandoff",
+          "line": 351
+        }
+      ],
+      "exports": [
+        "evaluateFunnel",
+        "explicitContactOptOut",
+        "explicitHandoffRequest",
+        "hasImmediateCommercialSignal"
+      ],
+      "imports": [
+        "src/commercial-decision.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 16
+    },
+    {
+      "path": "src/grounded-fallback.js",
+      "layer": "other",
+      "lines": 794,
+      "functions": [
+        {
+          "name": "buildFamilyAnswer",
+          "line": 92
+        },
+        {
+          "name": "buildGenericAnswer",
+          "line": 234
+        },
+        {
+          "name": "buildGroundedFallback",
+          "line": 694
+        },
+        {
+          "name": "buildProfileUpdateFallback",
+          "line": 564
+        },
+        {
+          "name": "buildProjectCompareAnswer",
+          "line": 316
+        },
+        {
+          "name": "buildVerifiedProjectOverview",
+          "line": 748
+        },
+        {
+          "name": "describe",
+          "line": 356
+        },
+        {
+          "name": "evidenceValues",
+          "line": 17
+        },
+        {
+          "name": "formatAedBudget",
+          "line": 538
+        },
+        {
+          "name": "get",
+          "line": 568
+        },
+        {
+          "name": "getFact",
+          "line": 37
+        },
+        {
+          "name": "getMemoryValue",
+          "line": 66
+        },
+        {
+          "name": "getRoleFact",
+          "line": 265
+        },
+        {
+          "name": "hasEvidence",
+          "line": 79
+        },
+        {
+          "name": "profileMemoryValue",
+          "line": 474
+        },
+        {
+          "name": "sanitizeEvidenceValue",
+          "line": 1
+        }
+      ],
+      "exports": [
+        "buildGroundedFallback",
+        "buildVerifiedProjectOverview"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 16
+    },
+    {
+      "path": "src/index.js",
+      "layer": "routing_core",
+      "lines": 7166,
+      "functions": [
+        {
+          "name": "buildConversationPatch",
+          "line": 820
+        },
+        {
+          "name": "buildResponse",
+          "line": 414
+        },
+        {
+          "name": "buildResumedContextReferenceV1",
+          "line": 248
+        },
+        {
+          "name": "canUseStatelessFastPath",
+          "line": 685
+        },
+        {
+          "name": "d0Emit",
+          "line": 1979
+        },
+        {
+          "name": "d0Enum",
+          "line": 1972
+        },
+        {
+          "name": "deliverVerifiedPaginationD2",
+          "line": 1884
+        },
+        {
+          "name": "e32ActiveDeveloper",
+          "line": 3091
+        },
+        {
+          "name": "emptyKnowledgePack",
+          "line": 593
+        },
+        {
+          "name": "explicitNewTaskAfterReturnV1",
+          "line": 209
+        },
+        {
+          "name": "extractColdStartViewingProjectV1",
+          "line": 182
+        },
+        {
+          "name": "f28NormalizeLocation",
+          "line": 4616
+        },
+        {
+          "name": "formatAED",
+          "line": 319
+        },
+        {
+          "name": "g29HasFact",
+          "line": 5905
+        },
+        {
+          "name": "i33Duration",
+          "line": 7109
+        },
+        {
+          "name": "i33Mark",
+          "line": 1965
+        },
+        {
+          "name": "inspectPersonaContactConsentV1",
+          "line": 441
+        },
+        {
+          "name": "isGlobalNoKnowledgeGuard",
+          "line": 615
+        },
+        {
+          "name": "isUnconsentedProjectViewingQuestionV1",
+          "line": 489
+        },
+        {
+          "name": "json",
+          "line": 405
+        },
+        {
+          "name": "mergeCurrentTurnMemory",
+          "line": 773
+        },
+        {
+          "name": "normalizeName",
+          "line": 4963
+        },
+        {
+          "name": "p003ProjectCandidateNameV1",
+          "line": 525
+        },
+        {
+          "name": "p003RelatedRequestV1",
+          "line": 543
+        },
+        {
+          "name": "p003VerifiedRelationshipV1",
+          "line": 554
+        },
+        {
+          "name": "p0EmptyFunnelDecision",
+          "line": 5406
+        },
+        {
+          "name": "p0OptOutDecision",
+          "line": 5410
+        },
+        {
+          "name": "persistDeterministicEntityDecisionTurnV1",
+          "line": 1220
+        },
+        {
+          "name": "persistDeterministicNameTurn",
+          "line": 888
+        },
+        {
+          "name": "persistDeterministicProfileTurnV1",
+          "line": 1106
+        },
+        {
+          "name": "persistenceTask",
+          "line": 6725
+        },
+        {
+          "name": "primaRestoreProjectCardsV2",
+          "line": 144
+        },
+        {
+          "name": "promoteConstraintLedPropertySearchRoute",
+          "line": 651
+        },
+        {
+          "name": "protectTopicMoveV1",
+          "line": 221
+        },
+        {
+          "name": "resolveE1ActiveReference",
+          "line": 3000
+        },
+        {
+          "name": "resolveE42DistrictProjectQuery",
+          "line": 5021
+        },
+        {
+          "name": "safeText",
+          "line": 148
+        }
+      ],
+      "exports": [],
+      "imports": [
+        "src/card-facts.js",
+        "src/commercial-context.js",
+        "src/compare.js",
+        "src/contact-capture.js",
+        "src/contact-first-turn-intro-h34.js",
+        "src/contact-handoff-presentation.js",
+        "src/contact-received-fastpath-i32.js",
+        "src/context.js",
+        "src/conversation-access.js",
+        "src/conversation-move.js",
+        "src/conversation-ordering.js",
+        "src/conversation-state.js",
+        "src/conversation-turn.js",
+        "src/decision-policy.js",
+        "src/developer-discovery-v1.js",
+        "src/developer-search-preview-v1.js",
+        "src/direct-contact-intent-h29.js",
+        "src/district-search-preview-v1.js",
+        "src/entity-decision-memory.js",
+        "src/entity-resolver.js",
+        "src/evidence-pack.js",
+        "src/fast-gate.js",
+        "src/funnel.js",
+        "src/grounded-fallback.js",
+        "src/knowledge.js",
+        "src/local-responses.js",
+        "src/memory-store.js",
+        "src/memory.js",
+        "src/openai-reasoning.js",
+        "src/pagination-fastpath-v1.js",
+        "src/persona-semantic-a1.js",
+        "src/prima-lead.js",
+        "src/prima-search-request.js",
+        "src/profile-update-v1.js",
+        "src/recommendation-criteria.js",
+        "src/request-interpreter.js",
+        "src/return-session-v1.js",
+        "src/router.js",
+        "src/search-context.js",
+        "src/search-knowledge.js",
+        "src/search-response.js",
+        "src/structured-answer.js",
+        "src/supabase.js",
+        "src/tool-registry.js"
+      ],
+      "static_import_count": 44,
+      "function_count": 37
+    },
+    {
+      "path": "src/knowledge-adapters.js",
+      "layer": "knowledge_entity",
+      "lines": 389,
+      "functions": [
+        {
+          "name": "buildAdapterPlan",
+          "line": 364
+        },
+        {
+          "name": "getAdapterPageTypes",
+          "line": 312
+        },
+        {
+          "name": "getBlockFamiliesForNeeds",
+          "line": 317
+        },
+        {
+          "name": "getKnowledgeAdapter",
+          "line": 305
+        },
+        {
+          "name": "getKnowledgePageTargets",
+          "line": 348
+        },
+        {
+          "name": "uniq",
+          "line": 300
+        }
+      ],
+      "exports": [
+        "buildAdapterPlan",
+        "getAdapterPageTypes",
+        "getBlockFamiliesForNeeds",
+        "getKnowledgeAdapter",
+        "getKnowledgePageTargets"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 6
+    },
+    {
+      "path": "src/knowledge-cross-page.js",
+      "layer": "knowledge_entity",
+      "lines": 1138,
+      "functions": [
+        {
+          "name": "buyerScenarioNeeds",
+          "line": 520
+        },
+        {
+          "name": "chooseBuyerScenario",
+          "line": 437
+        },
+        {
+          "name": "districtNeedsForPlanner",
+          "line": 478
+        },
+        {
+          "name": "getClientBudgetAed",
+          "line": 128
+        },
+        {
+          "name": "getDistrictBundleFamilies",
+          "line": 530
+        },
+        {
+          "name": "getMemoryValue",
+          "line": 158
+        },
+        {
+          "name": "numericFit",
+          "line": 41
+        },
+        {
+          "name": "numericValue",
+          "line": 23
+        },
+        {
+          "name": "parseMoney",
+          "line": 53
+        },
+        {
+          "name": "resolveCrossPageKnowledge",
+          "line": 800
+        },
+        {
+          "name": "resolveCrossPageKnowledgeFromBundle",
+          "line": 564
+        },
+        {
+          "name": "scenarioMeta",
+          "line": 18
+        },
+        {
+          "name": "scoreBuyerScenario",
+          "line": 172
+        },
+        {
+          "name": "uniq",
+          "line": 11
+        }
+      ],
+      "exports": [
+        "chooseBuyerScenario",
+        "getDistrictBundleFamilies",
+        "resolveCrossPageKnowledge",
+        "resolveCrossPageKnowledgeFromBundle",
+        "scoreBuyerScenario"
+      ],
+      "imports": [
+        "src/knowledge-adapters.js",
+        "src/supabase.js"
+      ],
+      "static_import_count": 2,
+      "function_count": 14
+    },
+    {
+      "path": "src/knowledge-planner.js",
+      "layer": "knowledge_entity",
+      "lines": 481,
+      "functions": [
+        {
+          "name": "baseCurrentEntityNeeds",
+          "line": 170
+        },
+        {
+          "name": "buildKnowledgePlan",
+          "line": 272
+        },
+        {
+          "name": "currentDomain",
+          "line": 158
+        },
+        {
+          "name": "detectTopics",
+          "line": 33
+        },
+        {
+          "name": "getKnowledgePlannerDebug",
+          "line": 461
+        },
+        {
+          "name": "hasAny",
+          "line": 26
+        },
+        {
+          "name": "topicNeeds",
+          "line": 192
+        },
+        {
+          "name": "uniq",
+          "line": 21
+        }
+      ],
+      "exports": [
+        "buildKnowledgePlan",
+        "getKnowledgePlannerDebug"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 8
+    },
+    {
+      "path": "src/knowledge.js",
+      "layer": "knowledge_entity",
+      "lines": 1006,
+      "functions": [
+        {
+          "name": "buildContextPage",
+          "line": 24
+        },
+        {
+          "name": "mergeBundleMemory",
+          "line": 192
+        },
+        {
+          "name": "resolveExactFact",
+          "line": 50
+        },
+        {
+          "name": "resolveKnowledge",
+          "line": 844
+        },
+        {
+          "name": "resolveProjectCompareKnowledge",
+          "line": 471
+        },
+        {
+          "name": "resolveSelectiveCurrentPage",
+          "line": 237
+        }
+      ],
+      "exports": [
+        "resolveKnowledge"
+      ],
+      "imports": [
+        "src/compare.js",
+        "src/knowledge-adapters.js",
+        "src/knowledge-cross-page.js",
+        "src/knowledge-planner.js",
+        "src/supabase.js"
+      ],
+      "static_import_count": 5,
+      "function_count": 6
+    },
+    {
+      "path": "src/local-responses.js",
+      "layer": "answer",
+      "lines": 520,
+      "functions": [
+        {
+          "name": "buildCriticalFactGuard",
+          "line": 124
+        },
+        {
+          "name": "buildLocalRouteAnswer",
+          "line": 193
+        },
+        {
+          "name": "getKeyFactValue",
+          "line": 49
+        },
+        {
+          "name": "getProjectName",
+          "line": 30
+        },
+        {
+          "name": "humanizeSlug",
+          "line": 17
+        }
+      ],
+      "exports": [
+        "buildLocalRouteAnswer"
+      ],
+      "imports": [
+        "src/follow-up.js",
+        "src/router.js"
+      ],
+      "static_import_count": 2,
+      "function_count": 5
+    },
+    {
+      "path": "src/locales/_shared/entity-aliases.mjs",
+      "layer": "knowledge_entity",
+      "lines": 40,
+      "functions": [
+        {
+          "name": "classifyRoomPhraseRu",
+          "line": 35
+        },
+        {
+          "name": "createAliasIndex",
+          "line": 10
+        },
+        {
+          "name": "normalizeAlias",
+          "line": 3
+        },
+        {
+          "name": "resolveAlias",
+          "line": 26
+        }
+      ],
+      "exports": [
+        "classifyRoomPhraseRu",
+        "createAliasIndex",
+        "normalizeAlias",
+        "resolveAlias"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 4
+    },
+    {
+      "path": "src/locales/_shared/locale-registry.mjs",
+      "layer": "knowledge_entity",
+      "lines": 27,
+      "functions": [
+        {
+          "name": "pageLanguage",
+          "line": 12
+        },
+        {
+          "name": "requireEnabled",
+          "line": 21
+        },
+        {
+          "name": "requireSupportedLocale",
+          "line": 16
+        }
+      ],
+      "exports": [
+        "LOCALE_META",
+        "SUPPORTED_TRANSLATION_LANGUAGES",
+        "pageLanguage",
+        "requireEnabled",
+        "requireSupportedLocale"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 3
+    },
+    {
+      "path": "src/locales/_shared/request-envelope.mjs",
+      "layer": "other",
+      "lines": 14,
+      "functions": [
+        {
+          "name": "localizedEntityUrl",
+          "line": 10
+        },
+        {
+          "name": "localizedSearchEnvelope",
+          "line": 3
+        }
+      ],
+      "exports": [
+        "localizedEntityUrl",
+        "localizedSearchEnvelope"
+      ],
+      "imports": [
+        "src/locales/_shared/locale-registry.mjs"
+      ],
+      "static_import_count": 1,
+      "function_count": 2
+    },
+    {
+      "path": "src/locales/ru/runtime/card-facts.js",
+      "layer": "other",
+      "lines": 471,
+      "functions": [
+        {
+          "name": "attachProjectCardFacts",
+          "line": 408
+        },
+        {
+          "name": "buildBundle",
+          "line": 172
+        },
+        {
+          "name": "finalJson",
+          "line": 80
+        },
+        {
+          "name": "keyFact",
+          "line": 113
+        },
+        {
+          "name": "normalizeProjectCardFactsResult",
+          "line": 303
+        },
+        {
+          "name": "projectCardFactsFromSearchKnowledge",
+          "line": 367
+        },
+        {
+          "name": "resolveProjectCardFacts",
+          "line": 322
+        },
+        {
+          "name": "searchSlugs",
+          "line": 26
+        },
+        {
+          "name": "text",
+          "line": 9
+        }
+      ],
+      "exports": [
+        "attachProjectCardFacts",
+        "normalizeProjectCardFactsResult",
+        "projectCardFactsFromSearchKnowledge",
+        "resolveProjectCardFacts"
+      ],
+      "imports": [
+        "src/supabase.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 9
+    },
+    {
+      "path": "src/locales/ru/runtime/contact-capture.js",
+      "layer": "commercial_safety",
+      "lines": 523,
+      "functions": [
+        {
+          "name": "activeFactValue",
+          "line": 3
+        },
+        {
+          "name": "currentFunnelState",
+          "line": 31
+        },
+        {
+          "name": "emptyDecision",
+          "line": 265
+        },
+        {
+          "name": "evaluateContactCapture",
+          "line": 278
+        },
+        {
+          "name": "explicitContactChannel",
+          "line": 55
+        },
+        {
+          "name": "extractEmail",
+          "line": 194
+        },
+        {
+          "name": "extractPhone",
+          "line": 153
+        },
+        {
+          "name": "hasContactCue",
+          "line": 94
+        },
+        {
+          "name": "hasExplicitVoluntaryContactCue",
+          "line": 88
+        },
+        {
+          "name": "isContactOnlyMessage",
+          "line": 221
+        },
+        {
+          "name": "normalizePhoneCandidate",
+          "line": 108
+        }
+      ],
+      "exports": [
+        "evaluateContactCapture",
+        "hasExplicitVoluntaryContactCue"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 11
+    },
+    {
+      "path": "src/locales/ru/runtime/contact-handoff-presentation.js",
+      "layer": "commercial_safety",
+      "lines": 70,
+      "functions": [
+        {
+          "name": "latestSafeName",
+          "line": 3
+        },
+        {
+          "name": "presentContactHandoffH28",
+          "line": 31
+        },
+        {
+          "name": "requestedChannel",
+          "line": 18
+        }
+      ],
+      "exports": [
+        "presentContactHandoffH28"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 3
+    },
+    {
+      "path": "src/locales/ru/runtime/context.js",
+      "layer": "memory_context",
+      "lines": 441,
+      "functions": [
+        {
+          "name": "buildContextEnvelope",
+          "line": 4
+        },
+        {
+          "name": "buildLocalContextEnvelope",
+          "line": 338
+        },
+        {
+          "name": "hydrateLocalConversationControlState",
+          "line": 184
+        }
+      ],
+      "exports": [
+        "buildContextEnvelope",
+        "buildLocalContextEnvelope",
+        "hydrateLocalConversationControlState"
+      ],
+      "imports": [
+        "src/locales/ru/runtime/search-context.js",
+        "src/supabase.js"
+      ],
+      "static_import_count": 2,
+      "function_count": 3
+    },
+    {
+      "path": "src/locales/ru/runtime/conversation-state.js",
+      "layer": "memory_context",
+      "lines": 1114,
+      "functions": [
+        {
+          "name": "activeFacts",
+          "line": 40
+        },
+        {
+          "name": "activeSearchContext",
+          "line": 250
+        },
+        {
+          "name": "applyConversationMoveToStateV1",
+          "line": 917
+        },
+        {
+          "name": "buildConversationStateV1",
+          "line": 404
+        },
+        {
+          "name": "cloneStateValue",
+          "line": 777
+        },
+        {
+          "name": "comparisonTarget",
+          "line": 178
+        },
+        {
+          "name": "currentEntity",
+          "line": 134
+        },
+        {
+          "name": "currentSearch",
+          "line": 236
+        },
+        {
+          "name": "latestMessage",
+          "line": 113
+        },
+        {
+          "name": "memoryValue",
+          "line": 49
+        },
+        {
+          "name": "numberOrNull",
+          "line": 62
+        },
+        {
+          "name": "persistedState",
+          "line": 82
+        },
+        {
+          "name": "recentMessages",
+          "line": 102
+        },
+        {
+          "name": "refreshConversationStateV1",
+          "line": 1093
+        },
+        {
+          "name": "restoreSuspendedThread",
+          "line": 842
+        },
+        {
+          "name": "searchBedrooms",
+          "line": 332
+        },
+        {
+          "name": "searchBudgetValue",
+          "line": 351
+        },
+        {
+          "name": "searchLocation",
+          "line": 306
+        },
+        {
+          "name": "searchPropertyType",
+          "line": 289
+        },
+        {
+          "name": "snapshotActiveThread",
+          "line": 791
+        },
+        {
+          "name": "threadRoute",
+          "line": 396
+        }
+      ],
+      "exports": [
+        "applyConversationMoveToStateV1",
+        "buildConversationStateV1",
+        "refreshConversationStateV1"
+      ],
+      "imports": [
+        "src/compare.js",
+        "src/preferred-location-v1.js"
+      ],
+      "static_import_count": 2,
+      "function_count": 21
+    },
+    {
+      "path": "src/locales/ru/runtime/developer-discovery-v1.js",
+      "layer": "other",
+      "lines": 149,
+      "functions": [
+        {
+          "name": "discoverDevelopersV1",
+          "line": 37
+        },
+        {
+          "name": "normalize",
+          "line": 4
+        },
+        {
+          "name": "queryTarget",
+          "line": 13
+        },
+        {
+          "name": "title",
+          "line": 8
+        }
+      ],
+      "exports": [
+        "discoverDevelopersV1"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 4
+    },
+    {
+      "path": "src/locales/ru/runtime/developer-project-groups-v1.js",
+      "layer": "other",
+      "lines": 131,
+      "functions": [
+        {
+          "name": "groupDeveloperProjectMatchesV1",
+          "line": 11
+        },
+        {
+          "name": "key",
+          "line": 1
+        }
+      ],
+      "exports": [
+        "groupDeveloperProjectMatchesV1"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 2
+    },
+    {
+      "path": "src/locales/ru/runtime/developer-search-preview-v1.js",
+      "layer": "search_recommendation",
+      "lines": 366,
+      "functions": [
+        {
+          "name": "fact",
+          "line": 339
+        },
+        {
+          "name": "handleD4DeveloperPreview",
+          "line": 5
+        },
+        {
+          "name": "key",
+          "line": 152
+        }
+      ],
+      "exports": [
+        "handleD4DeveloperPreview"
+      ],
+      "imports": [
+        "src/locales/ru/runtime/developer-discovery-v1.js",
+        "src/locales/ru/runtime/developer-project-groups-v1.js",
+        "src/supabase.js"
+      ],
+      "static_import_count": 3,
+      "function_count": 3
+    },
+    {
+      "path": "src/locales/ru/runtime/district-budget-search-v1.js",
+      "layer": "search_recommendation",
+      "lines": 259,
+      "functions": [
+        {
+          "name": "exactPropertyType",
+          "line": 130
+        },
+        {
+          "name": "matchDistrictBudgetProjectV1",
+          "line": 149
+        },
+        {
+          "name": "norm",
+          "line": 9
+        },
+        {
+          "name": "parseDistrictBudgetQueryV1",
+          "line": 55
+        },
+        {
+          "name": "resolveDistrict",
+          "line": 108
+        },
+        {
+          "name": "searchDistrictBudgetV1",
+          "line": 173
+        },
+        {
+          "name": "title",
+          "line": 51
+        }
+      ],
+      "exports": [
+        "matchDistrictBudgetProjectV1",
+        "parseDistrictBudgetQueryV1",
+        "searchDistrictBudgetV1"
+      ],
+      "imports": [
+        "src/district-emirates-v1.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 7
+    },
+    {
+      "path": "src/locales/ru/runtime/district-combined-search-v1.js",
+      "layer": "search_recommendation",
+      "lines": 185,
+      "functions": [
+        {
+          "name": "collectPages",
+          "line": 68
+        },
+        {
+          "name": "compact",
+          "line": 25
+        },
+        {
+          "name": "parseDistrictCombinedQueryV1",
+          "line": 28
+        },
+        {
+          "name": "searchDistrictCombinedV1",
+          "line": 104
+        }
+      ],
+      "exports": [
+        "parseDistrictCombinedQueryV1",
+        "searchDistrictCombinedV1"
+      ],
+      "imports": [
+        "src/locales/ru/runtime/district-budget-search-v1.js",
+        "src/locales/ru/runtime/district-intelligence-search-v1.js"
+      ],
+      "static_import_count": 2,
+      "function_count": 4
+    },
+    {
+      "path": "src/locales/ru/runtime/district-developer-search-v1.js",
+      "layer": "search_recommendation",
+      "lines": 370,
+      "functions": [
+        {
+          "name": "collectQualitative",
+          "line": 160
+        },
+        {
+          "name": "developerKey",
+          "line": 25
+        },
+        {
+          "name": "exactProperty",
+          "line": 93
+        },
+        {
+          "name": "matchDistrictDeveloperProjectV1",
+          "line": 113
+        },
+        {
+          "name": "norm",
+          "line": 19
+        },
+        {
+          "name": "parseDistrictDeveloperQueryV1",
+          "line": 185
+        },
+        {
+          "name": "propertyName",
+          "line": 70
+        },
+        {
+          "name": "resolveDistrict",
+          "line": 77
+        },
+        {
+          "name": "searchDistrictDeveloperV1",
+          "line": 278
+        },
+        {
+          "name": "title",
+          "line": 66
+        }
+      ],
+      "exports": [
+        "matchDistrictDeveloperProjectV1",
+        "parseDistrictDeveloperQueryV1",
+        "searchDistrictDeveloperV1"
+      ],
+      "imports": [
+        "src/district-emirates-v1.js",
+        "src/locales/ru/runtime/district-budget-search-v1.js",
+        "src/locales/ru/runtime/district-intelligence-search-v1.js"
+      ],
+      "static_import_count": 3,
+      "function_count": 10
+    },
+    {
+      "path": "src/locales/ru/runtime/district-discovery-v1.js",
+      "layer": "other",
+      "lines": 125,
+      "functions": [
+        {
+          "name": "discoverDistrictsV1",
+          "line": 30
+        },
+        {
+          "name": "display",
+          "line": 13
+        },
+        {
+          "name": "normalize",
+          "line": 8
+        },
+        {
+          "name": "queryTarget",
+          "line": 18
+        }
+      ],
+      "exports": [
+        "discoverDistrictsV1"
+      ],
+      "imports": [
+        "src/district-emirates-v1.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 4
+    },
+    {
+      "path": "src/locales/ru/runtime/district-intelligence-search-v1.js",
+      "layer": "search_recommendation",
+      "lines": 204,
+      "functions": [
+        {
+          "name": "display",
+          "line": 115
+        },
+        {
+          "name": "getEvidence",
+          "line": 67
+        },
+        {
+          "name": "norm",
+          "line": 11
+        },
+        {
+          "name": "parseDistrictIntelligenceQueryV1",
+          "line": 45
+        },
+        {
+          "name": "searchDistrictIntelligenceV1",
+          "line": 119
+        }
+      ],
+      "exports": [
+        "parseDistrictIntelligenceQueryV1",
+        "searchDistrictIntelligenceV1"
+      ],
+      "imports": [
+        "src/district-emirates-v1.js",
+        "src/district-intelligence-v1.js"
+      ],
+      "static_import_count": 2,
+      "function_count": 5
+    },
+    {
+      "path": "src/locales/ru/runtime/district-search-preview-v1.js",
+      "layer": "search_recommendation",
+      "lines": 556,
+      "functions": [
+        {
+          "name": "allowedPhoto",
+          "line": 297
+        },
+        {
+          "name": "body",
+          "line": 249
+        },
+        {
+          "name": "handleD5DistrictPreview",
+          "line": 21
+        },
+        {
+          "name": "norm",
+          "line": 18
+        }
+      ],
+      "exports": [
+        "handleD5DistrictPreview"
+      ],
+      "imports": [
+        "src/locales/ru/runtime/district-budget-search-v1.js",
+        "src/locales/ru/runtime/district-combined-search-v1.js",
+        "src/locales/ru/runtime/district-developer-search-v1.js",
+        "src/locales/ru/runtime/district-discovery-v1.js",
+        "src/locales/ru/runtime/district-intelligence-search-v1.js",
+        "src/supabase.js"
+      ],
+      "static_import_count": 6,
+      "function_count": 4
+    },
+    {
+      "path": "src/locales/ru/runtime/fast-gate.js",
+      "layer": "routing_core",
+      "lines": 904,
+      "functions": [
+        {
+          "name": "cleanDeterministicEntityName",
+          "line": 204
+        },
+        {
+          "name": "currentEntity",
+          "line": 124
+        },
+        {
+          "name": "detectStructuredFactKeysV1",
+          "line": 376
+        },
+        {
+          "name": "detectedExactFacts",
+          "line": 75
+        },
+        {
+          "name": "evaluateFastGate",
+          "line": 447
+        },
+        {
+          "name": "extractDeterministicEntityCandidate",
+          "line": 217
+        },
+        {
+          "name": "hasContactIntent",
+          "line": 100
+        },
+        {
+          "name": "hasPotentialExplicitEntityReference",
+          "line": 143
+        },
+        {
+          "name": "hasResolvedEntity",
+          "line": 110
+        },
+        {
+          "name": "matchesAny",
+          "line": 65
+        },
+        {
+          "name": "recognizeStructuredFactQuestionV1",
+          "line": 380
+        },
+        {
+          "name": "resolveContextualPersonaIntent",
+          "line": 397
+        }
+      ],
+      "exports": [
+        "detectStructuredFactKeysV1",
+        "evaluateFastGate",
+        "extractDeterministicEntityCandidate",
+        "recognizeStructuredFactQuestionV1",
+        "resolveContextualPersonaIntent"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 12
+    },
+    {
+      "path": "src/locales/ru/runtime/funnel.js",
+      "layer": "commercial_safety",
+      "lines": 1121,
+      "functions": [
+        {
+          "name": "acceptedPreviousOffer",
+          "line": 229
+        },
+        {
+          "name": "activeFactValue",
+          "line": 2
+        },
+        {
+          "name": "candidateOffer",
+          "line": 353
+        },
+        {
+          "name": "canonicalCommercialSignal",
+          "line": 307
+        },
+        {
+          "name": "commercialProgressScore",
+          "line": 30
+        },
+        {
+          "name": "declinedPreviousOffer",
+          "line": 250
+        },
+        {
+          "name": "emptyDecision",
+          "line": 513
+        },
+        {
+          "name": "evaluateFunnel",
+          "line": 562
+        },
+        {
+          "name": "explicitContactOptOut",
+          "line": 187
+        },
+        {
+          "name": "explicitHandoffRequest",
+          "line": 202
+        },
+        {
+          "name": "funnelFact",
+          "line": 497
+        },
+        {
+          "name": "g38TemporaryRefusal",
+          "line": 532
+        },
+        {
+          "name": "hasCanonicalCommercialFact",
+          "line": 280
+        },
+        {
+          "name": "hasImmediateCommercialSignal",
+          "line": 134
+        },
+        {
+          "name": "hasShortlist",
+          "line": 115
+        },
+        {
+          "name": "semanticDirectHandoff",
+          "line": 343
+        }
+      ],
+      "exports": [
+        "evaluateFunnel",
+        "explicitContactOptOut",
+        "explicitHandoffRequest",
+        "hasImmediateCommercialSignal"
+      ],
+      "imports": [
+        "src/commercial-decision.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 16
+    },
+    {
+      "path": "src/locales/ru/runtime/grounded-fallback.js",
+      "layer": "other",
+      "lines": 786,
+      "functions": [
+        {
+          "name": "buildFamilyAnswer",
+          "line": 92
+        },
+        {
+          "name": "buildGenericAnswer",
+          "line": 230
+        },
+        {
+          "name": "buildGroundedFallback",
+          "line": 686
+        },
+        {
+          "name": "buildProfileUpdateFallback",
+          "line": 560
+        },
+        {
+          "name": "buildProjectCompareAnswer",
+          "line": 312
+        },
+        {
+          "name": "buildVerifiedProjectOverview",
+          "line": 740
+        },
+        {
+          "name": "describe",
+          "line": 352
+        },
+        {
+          "name": "evidenceValues",
+          "line": 17
+        },
+        {
+          "name": "formatAedBudget",
+          "line": 534
+        },
+        {
+          "name": "get",
+          "line": 564
+        },
+        {
+          "name": "getFact",
+          "line": 37
+        },
+        {
+          "name": "getMemoryValue",
+          "line": 66
+        },
+        {
+          "name": "getRoleFact",
+          "line": 261
+        },
+        {
+          "name": "hasEvidence",
+          "line": 79
+        },
+        {
+          "name": "profileMemoryValue",
+          "line": 470
+        },
+        {
+          "name": "sanitizeEvidenceValue",
+          "line": 1
+        }
+      ],
+      "exports": [
+        "buildGroundedFallback",
+        "buildVerifiedProjectOverview"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 16
+    },
+    {
+      "path": "src/locales/ru/runtime/index.js",
+      "layer": "routing_core",
+      "lines": 6456,
+      "functions": [
+        {
+          "name": "buildConversationPatch",
+          "line": 739
+        },
+        {
+          "name": "buildResponse",
+          "line": 404
+        },
+        {
+          "name": "buildResumedContextReferenceV1",
+          "line": 237
+        },
+        {
+          "name": "canUseStatelessFastPath",
+          "line": 604
+        },
+        {
+          "name": "e32ActiveDeveloper",
+          "line": 2742
+        },
+        {
+          "name": "emptyKnowledgePack",
+          "line": 512
+        },
+        {
+          "name": "explicitNewTaskAfterReturnV1",
+          "line": 198
+        },
+        {
+          "name": "extractColdStartViewingProjectV1",
+          "line": 171
+        },
+        {
+          "name": "f28NormalizeLocation",
+          "line": 4047
+        },
+        {
+          "name": "formatAED",
+          "line": 308
+        },
+        {
+          "name": "g29HasFact",
+          "line": 5223
+        },
+        {
+          "name": "i33Duration",
+          "line": 6406
+        },
+        {
+          "name": "i33Mark",
+          "line": 1812
+        },
+        {
+          "name": "inspectPersonaContactConsentV1",
+          "line": 431
+        },
+        {
+          "name": "isGlobalNoKnowledgeGuard",
+          "line": 534
+        },
+        {
+          "name": "isUnconsentedProjectViewingQuestionV1",
+          "line": 479
+        },
+        {
+          "name": "json",
+          "line": 395
+        },
+        {
+          "name": "mergeCurrentTurnMemory",
+          "line": 692
+        },
+        {
+          "name": "normalizeName",
+          "line": 4381
+        },
+        {
+          "name": "p0EmptyFunnelDecision",
+          "line": 4752
+        },
+        {
+          "name": "p0OptOutDecision",
+          "line": 4756
+        },
+        {
+          "name": "persistDeterministicEntityDecisionTurnV1",
+          "line": 1139
+        },
+        {
+          "name": "persistDeterministicNameTurn",
+          "line": 807
+        },
+        {
+          "name": "persistDeterministicProfileTurnV1",
+          "line": 1025
+        },
+        {
+          "name": "persistenceTask",
+          "line": 6028
+        },
+        {
+          "name": "primaRestoreProjectCardsV2",
+          "line": 133
+        },
+        {
+          "name": "promoteConstraintLedPropertySearchRoute",
+          "line": 570
+        },
+        {
+          "name": "protectTopicMoveV1",
+          "line": 210
+        },
+        {
+          "name": "resolveE1ActiveReference",
+          "line": 2651
+        },
+        {
+          "name": "resolveE42DistrictProjectQuery",
+          "line": 4443
+        },
+        {
+          "name": "safeText",
+          "line": 137
+        }
+      ],
+      "exports": [],
+      "imports": [
+        "src/commercial-context.js",
+        "src/compare.js",
+        "src/contact-first-turn-intro-h34.js",
+        "src/contact-received-fastpath-i32.js",
+        "src/conversation-access.js",
+        "src/conversation-move.js",
+        "src/conversation-ordering.js",
+        "src/conversation-turn.js",
+        "src/decision-policy.js",
+        "src/direct-contact-intent-h29.js",
+        "src/entity-decision-memory.js",
+        "src/entity-resolver.js",
+        "src/evidence-pack.js",
+        "src/knowledge.js",
+        "src/locales/ru/runtime/card-facts.js",
+        "src/locales/ru/runtime/contact-capture.js",
+        "src/locales/ru/runtime/contact-handoff-presentation.js",
+        "src/locales/ru/runtime/context.js",
+        "src/locales/ru/runtime/conversation-state.js",
+        "src/locales/ru/runtime/developer-discovery-v1.js",
+        "src/locales/ru/runtime/developer-search-preview-v1.js",
+        "src/locales/ru/runtime/district-search-preview-v1.js",
+        "src/locales/ru/runtime/fast-gate.js",
+        "src/locales/ru/runtime/funnel.js",
+        "src/locales/ru/runtime/grounded-fallback.js",
+        "src/locales/ru/runtime/local-responses.js",
+        "src/locales/ru/runtime/openai-reasoning.js",
+        "src/locales/ru/runtime/persona-semantic-a1.js",
+        "src/locales/ru/runtime/prima-lead.js",
+        "src/locales/ru/runtime/prima-search-request.js",
+        "src/locales/ru/runtime/profile-update-v1.js",
+        "src/locales/ru/runtime/request-interpreter.js",
+        "src/locales/ru/runtime/return-session-v1.js",
+        "src/locales/ru/runtime/router.js",
+        "src/locales/ru/runtime/ru-routing-v1.js",
+        "src/locales/ru/runtime/search-knowledge.js",
+        "src/locales/ru/runtime/search-response.js",
+        "src/locales/ru/runtime/structured-answer.js",
+        "src/locales/ru/runtime/tool-registry.js",
+        "src/memory-store.js",
+        "src/memory.js",
+        "src/recommendation-criteria.js",
+        "src/supabase.js"
+      ],
+      "static_import_count": 43,
+      "function_count": 31
+    },
+    {
+      "path": "src/locales/ru/runtime/local-responses.js",
+      "layer": "answer",
+      "lines": 520,
+      "functions": [
+        {
+          "name": "buildCriticalFactGuard",
+          "line": 124
+        },
+        {
+          "name": "buildLocalRouteAnswer",
+          "line": 193
+        },
+        {
+          "name": "getKeyFactValue",
+          "line": 49
+        },
+        {
+          "name": "getProjectName",
+          "line": 30
+        },
+        {
+          "name": "humanizeSlug",
+          "line": 17
+        }
+      ],
+      "exports": [
+        "buildLocalRouteAnswer"
+      ],
+      "imports": [
+        "src/follow-up.js",
+        "src/locales/ru/runtime/router.js"
+      ],
+      "static_import_count": 2,
+      "function_count": 5
+    },
+    {
+      "path": "src/locales/ru/runtime/openai-reasoning.js",
+      "layer": "answer",
+      "lines": 553,
+      "functions": [
+        {
+          "name": "compactEvidenceText",
+          "line": 125
+        },
+        {
+          "name": "compactReasoningEvidence",
+          "line": 146
+        },
+        {
+          "name": "compactSourceItems",
+          "line": 134
+        },
+        {
+          "name": "extractOutputText",
+          "line": 93
+        },
+        {
+          "name": "generatePrimaAnswer",
+          "line": 305
+        },
+        {
+          "name": "getReasoningEffort",
+          "line": 10
+        },
+        {
+          "name": "shouldUseOpenAI",
+          "line": 29
+        }
+      ],
+      "exports": [
+        "generatePrimaAnswer",
+        "shouldUseOpenAI"
+      ],
+      "imports": [
+        "src/locales/ru/runtime/persona-runtime.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 7
+    },
+    {
+      "path": "src/locales/ru/runtime/persona-runtime.js",
+      "layer": "other",
+      "lines": 151,
+      "functions": [
+        {
+          "name": "buildPersonaInstructions",
+          "line": 76
+        }
+      ],
+      "exports": [
+        "buildPersonaInstructions"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 1
+    },
+    {
+      "path": "src/locales/ru/runtime/persona-semantic-a1.js",
+      "layer": "routing_core",
+      "lines": 378,
+      "functions": [
+        {
+          "name": "buildInstructions",
+          "line": 50
+        },
+        {
+          "name": "buildPurePersonaInstructions",
+          "line": 149
+        },
+        {
+          "name": "compactInput",
+          "line": 215
+        },
+        {
+          "name": "contains",
+          "line": 73
+        },
+        {
+          "name": "cut",
+          "line": 204
+        },
+        {
+          "name": "eligible",
+          "line": 209
+        },
+        {
+          "name": "founderContextRelevant",
+          "line": 39
+        },
+        {
+          "name": "generate",
+          "line": 304
+        },
+        {
+          "name": "hasConcreteBuyerTask",
+          "line": 127
+        },
+        {
+          "name": "interpretationForRoute",
+          "line": 270
+        },
+        {
+          "name": "looksLikeExternalTask",
+          "line": 117
+        },
+        {
+          "name": "looksLikePersonalUpdate",
+          "line": 113
+        },
+        {
+          "name": "outputText",
+          "line": 263
+        },
+        {
+          "name": "recentPersonaContext",
+          "line": 74
+        },
+        {
+          "name": "redact",
+          "line": 205
+        },
+        {
+          "name": "selectPersonaSections",
+          "line": 84
+        },
+        {
+          "name": "usePurePersona",
+          "line": 139
+        }
+      ],
+      "exports": [
+        "compactInput",
+        "eligible",
+        "generate"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 17
+    },
+    {
+      "path": "src/locales/ru/runtime/prima-lead-handoff-i31.js",
+      "layer": "commercial_safety",
+      "lines": 117,
+      "functions": [
+        {
+          "name": "clean",
+          "line": 10
+        },
+        {
+          "name": "deriveHandoffI31",
+          "line": 49
+        },
+        {
+          "name": "isExplicitContactRequest",
+          "line": 22
+        },
+        {
+          "name": "prepareLeadHandoffContextI31",
+          "line": 76
+        },
+        {
+          "name": "projectCandidateI31",
+          "line": 34
+        },
+        {
+          "name": "serviceFromText",
+          "line": 13
+        },
+        {
+          "name": "short",
+          "line": 11
+        }
+      ],
+      "exports": [
+        "deriveHandoffI31",
+        "prepareLeadHandoffContextI31",
+        "projectCandidateI31"
+      ],
+      "imports": [
+        "src/entity-resolver.js",
+        "src/supabase.js"
+      ],
+      "static_import_count": 2,
+      "function_count": 7
+    },
+    {
+      "path": "src/locales/ru/runtime/prima-lead.js",
+      "layer": "commercial_safety",
+      "lines": 745,
+      "functions": [
+        {
+          "name": "buildFunnelContext",
+          "line": 242
+        },
+        {
+          "name": "buildPrimaLeadRpcPayload",
+          "line": 365
+        },
+        {
+          "name": "buildProjectDecisions",
+          "line": 148
+        },
+        {
+          "name": "buildRequestSummary",
+          "line": 290
+        },
+        {
+          "name": "buildRequirements",
+          "line": 113
+        },
+        {
+          "name": "buildSearchProjects",
+          "line": 217
+        },
+        {
+          "name": "factMap",
+          "line": 25
+        },
+        {
+          "name": "persistPrimaLeadV1",
+          "line": 649
+        },
+        {
+          "name": "requirementValue",
+          "line": 88
+        },
+        {
+          "name": "text",
+          "line": 50
+        },
+        {
+          "name": "uuid",
+          "line": 70
+        }
+      ],
+      "exports": [
+        "buildPrimaLeadRpcPayload",
+        "persistPrimaLeadV1"
+      ],
+      "imports": [
+        "src/locales/ru/runtime/prima-lead-handoff-i31.js",
+        "src/memory-store.js",
+        "src/preferred-location-v1.js",
+        "src/supabase.js"
+      ],
+      "static_import_count": 4,
+      "function_count": 11
+    },
+    {
+      "path": "src/locales/ru/runtime/prima-search-request.js",
+      "layer": "search_recommendation",
+      "lines": 660,
+      "functions": [
+        {
+          "name": "augmentSearchQueryWithMemory",
+          "line": 216
+        },
+        {
+          "name": "buildPrimaSearchRequest",
+          "line": 555
+        },
+        {
+          "name": "completedSearchContext",
+          "line": 17
+        },
+        {
+          "name": "contextualSearchQuery",
+          "line": 47
+        },
+        {
+          "name": "explicitMaxBudgetContinuation",
+          "line": 356
+        },
+        {
+          "name": "firstValid",
+          "line": 507
+        },
+        {
+          "name": "hasFact",
+          "line": 426
+        },
+        {
+          "name": "humanizeSlug",
+          "line": 2
+        },
+        {
+          "name": "memoryValue",
+          "line": 126
+        },
+        {
+          "name": "personalizedRecommendationV1",
+          "line": 479
+        },
+        {
+          "name": "recommendationNeedsSearch",
+          "line": 155
+        },
+        {
+          "name": "saved",
+          "line": 498
+        }
+      ],
+      "exports": [
+        "buildPrimaSearchRequest"
+      ],
+      "imports": [
+        "src/preferred-location-v1.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 12
+    },
+    {
+      "path": "src/locales/ru/runtime/profile-update-v1.js",
+      "layer": "other",
+      "lines": 101,
+      "functions": [
+        {
+          "name": "buildBuyerProfileAcknowledgementV1",
+          "line": 77
+        },
+        {
+          "name": "classifyPureBuyerProfileUpdateV1",
+          "line": 32
+        },
+        {
+          "name": "duration",
+          "line": 23
+        },
+        {
+          "name": "memoryValue",
+          "line": 72
+        }
+      ],
+      "exports": [
+        "buildBuyerProfileAcknowledgementV1",
+        "classifyPureBuyerProfileUpdateV1"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 4
+    },
+    {
+      "path": "src/locales/ru/runtime/request-interpreter.js",
+      "layer": "routing_core",
+      "lines": 666,
+      "functions": [
+        {
+          "name": "buildInput",
+          "line": 428
+        },
+        {
+          "name": "compactConversation",
+          "line": 400
+        },
+        {
+          "name": "compactMemory",
+          "line": 378
+        },
+        {
+          "name": "extractOutputText",
+          "line": 349
+        },
+        {
+          "name": "instructions",
+          "line": 483
+        },
+        {
+          "name": "interpretRequest",
+          "line": 498
+        },
+        {
+          "name": "safeText",
+          "line": 406
+        }
+      ],
+      "exports": [
+        "interpretRequest"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 7
+    },
+    {
+      "path": "src/locales/ru/runtime/return-session-v1.js",
+      "layer": "other",
+      "lines": 130,
+      "functions": [
+        {
+          "name": "cookieNameForRequest",
+          "line": 43
+        },
+        {
+          "name": "primaCredentialedJsonV1",
+          "line": 104
+        },
+        {
+          "name": "primaIssueReturnCookieV1",
+          "line": 76
+        },
+        {
+          "name": "primaReadReturnSessionV1",
+          "line": 86
+        },
+        {
+          "name": "primaReturnTrustedOriginV1",
+          "line": 17
+        },
+        {
+          "name": "primaTrustedPreflightHeadersV1",
+          "line": 121
+        },
+        {
+          "name": "sessionSecret",
+          "line": 54
+        },
+        {
+          "name": "signValue",
+          "line": 64
+        }
+      ],
+      "exports": [
+        "primaCredentialedJsonV1",
+        "primaIssueReturnCookieV1",
+        "primaReadReturnSessionV1",
+        "primaReturnTrustedOriginV1",
+        "primaTrustedPreflightHeadersV1"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 8
+    },
+    {
+      "path": "src/locales/ru/runtime/router.js",
+      "layer": "routing_core",
+      "lines": 493,
+      "functions": [
+        {
+          "name": "classifyClearlyOffTopicRequest",
+          "line": 7
+        },
+        {
+          "name": "hasConversationContext",
+          "line": 24
+        },
+        {
+          "name": "hasPageContext",
+          "line": 35
+        },
+        {
+          "name": "routeIntent",
+          "line": 45
+        }
+      ],
+      "exports": [
+        "classifyClearlyOffTopicRequest",
+        "routeIntent"
+      ],
+      "imports": [
+        "src/locales/ru/runtime/fast-gate.js",
+        "src/memory.js"
+      ],
+      "static_import_count": 2,
+      "function_count": 4
+    },
+    {
+      "path": "src/locales/ru/runtime/ru-intent-v1.js",
+      "layer": "other",
+      "lines": 109,
+      "functions": [
+        {
+          "name": "detectIntent",
+          "line": 78
+        },
+        {
+          "name": "escapeRe",
+          "line": 34
+        },
+        {
+          "name": "hasPhrase",
+          "line": 35
+        },
+        {
+          "name": "interpretRussianRequest",
+          "line": 91
+        },
+        {
+          "name": "normalize",
+          "line": 31
+        },
+        {
+          "name": "parseBedrooms",
+          "line": 41
+        },
+        {
+          "name": "parseBudget",
+          "line": 52
+        },
+        {
+          "name": "pick",
+          "line": 36
+        }
+      ],
+      "exports": [
+        "interpretRussianRequest",
+        "ruAliasPolicy"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 8
+    },
+    {
+      "path": "src/locales/ru/runtime/ru-routing-v1.js",
+      "layer": "other",
+      "lines": 34,
+      "functions": [
+        {
+          "name": "routeIntentRuV1",
+          "line": 6
+        }
+      ],
+      "exports": [
+        "routeIntentRuV1"
+      ],
+      "imports": [
+        "src/locales/ru/runtime/router.js",
+        "src/locales/ru/runtime/ru-intent-v1.js"
+      ],
+      "static_import_count": 2,
+      "function_count": 1
+    },
+    {
+      "path": "src/locales/ru/runtime/search-context.js",
+      "layer": "search_recommendation",
+      "lines": 441,
+      "functions": [
+        {
+          "name": "budget",
+          "line": 43
+        },
+        {
+          "name": "list",
+          "line": 32
+        },
+        {
+          "name": "normalizeE24EntitySearchContextV1",
+          "line": 159
+        },
+        {
+          "name": "normalizeSearchContextV1",
+          "line": 247
+        },
+        {
+          "name": "number",
+          "line": 16
+        },
+        {
+          "name": "result",
+          "line": 78
+        },
+        {
+          "name": "text",
+          "line": 3
+        }
+      ],
+      "exports": [
+        "normalizeSearchContextV1"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 7
+    },
+    {
+      "path": "src/locales/ru/runtime/search-knowledge.js",
+      "layer": "knowledge_entity",
+      "lines": 417,
+      "functions": [
+        {
+          "name": "mergeSearchCandidateKnowledge",
+          "line": 289
+        },
+        {
+          "name": "normalizeBlock",
+          "line": 81
+        },
+        {
+          "name": "normalizeSearchKnowledgeResult",
+          "line": 168
+        },
+        {
+          "name": "resolveSearchCandidateKnowledge",
+          "line": 242
+        },
+        {
+          "name": "shouldResolveSearchCandidateKnowledge",
+          "line": 62
+        },
+        {
+          "name": "unique",
+          "line": 278
+        },
+        {
+          "name": "validSearchSlugs",
+          "line": 14
+        }
+      ],
+      "exports": [
+        "mergeSearchCandidateKnowledge",
+        "normalizeSearchKnowledgeResult",
+        "resolveSearchCandidateKnowledge",
+        "shouldResolveSearchCandidateKnowledge"
+      ],
+      "imports": [
+        "src/supabase.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 7
+    },
+    {
+      "path": "src/locales/ru/runtime/search-response.js",
+      "layer": "answer",
+      "lines": 385,
+      "functions": [
+        {
+          "name": "buildSearchRouteResponse",
+          "line": 189
+        },
+        {
+          "name": "buildVerifiedEntitySearchResponseV5",
+          "line": 120
+        },
+        {
+          "name": "cardRefs",
+          "line": 47
+        },
+        {
+          "name": "recommendationPageSize",
+          "line": 33
+        },
+        {
+          "name": "validSearch",
+          "line": 4
+        }
+      ],
+      "exports": [
+        "buildSearchRouteResponse"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 5
+    },
+    {
+      "path": "src/locales/ru/runtime/structured-answer.js",
+      "layer": "answer",
+      "lines": 566,
+      "functions": [
+        {
+          "name": "buildStructuredAnswer",
+          "line": 416
+        },
+        {
+          "name": "fallbackFacts",
+          "line": 227
+        },
+        {
+          "name": "findFact",
+          "line": 25
+        },
+        {
+          "name": "getKeyFacts",
+          "line": 1
+        },
+        {
+          "name": "humanFactLabel",
+          "line": 407
+        },
+        {
+          "name": "humanizeSlug",
+          "line": 82
+        },
+        {
+          "name": "relationValueForFact",
+          "line": 309
+        },
+        {
+          "name": "subjectName",
+          "line": 98
+        },
+        {
+          "name": "valueOf",
+          "line": 52
+        }
+      ],
+      "exports": [
+        "buildStructuredAnswer"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 9
+    },
+    {
+      "path": "src/locales/ru/runtime/tool-registry.js",
+      "layer": "knowledge_entity",
+      "lines": 110,
+      "functions": [
+        {
+          "name": "canUseTool",
+          "line": 101
+        },
+        {
+          "name": "getAllowedTools",
+          "line": 85
+        },
+        {
+          "name": "getToolIds",
+          "line": 107
+        }
+      ],
+      "exports": [
+        "TOOL_REGISTRY_V1",
+        "canUseTool",
+        "getAllowedTools",
+        "getToolIds"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 3
+    },
+    {
+      "path": "src/memory-store.js",
+      "layer": "memory_context",
+      "lines": 136,
+      "functions": [
+        {
+          "name": "loadActiveMemory",
+          "line": 122
+        },
+        {
+          "name": "normalizeUuid",
+          "line": 16
+        },
+        {
+          "name": "persistMemoryFacts",
+          "line": 30
+        }
+      ],
+      "exports": [
+        "loadActiveMemory",
+        "persistMemoryFacts"
+      ],
+      "imports": [
+        "src/memory.js",
+        "src/supabase.js"
+      ],
+      "static_import_count": 2,
+      "function_count": 3
+    },
+    {
+      "path": "src/memory.js",
+      "layer": "memory_context",
+      "lines": 1263,
+      "functions": [
+        {
+          "name": "cleanTextValue",
+          "line": 38
+        },
+        {
+          "name": "extractMemoryFacts",
+          "line": 418
+        },
+        {
+          "name": "isContextualNameCandidate",
+          "line": 219
+        },
+        {
+          "name": "isEvidenceBackedUserName",
+          "line": 288
+        },
+        {
+          "name": "isExpectingNameFromRecentMessages",
+          "line": 365
+        },
+        {
+          "name": "isExplicitNameOnlyMessage",
+          "line": 345
+        },
+        {
+          "name": "isNonNameOnboardingReply",
+          "line": 232
+        },
+        {
+          "name": "isStandaloneGreeting",
+          "line": 269
+        },
+        {
+          "name": "looksLikeBareName",
+          "line": 138
+        },
+        {
+          "name": "looksLikeQuestionOrRequest",
+          "line": 192
+        },
+        {
+          "name": "normalizeMemoryFactValue",
+          "line": 1134
+        },
+        {
+          "name": "normalizeMemoryFacts",
+          "line": 1199
+        },
+        {
+          "name": "normalizePreferredName",
+          "line": 58
+        },
+        {
+          "name": "parseCompactNumber",
+          "line": 15
+        },
+        {
+          "name": "setFact",
+          "line": 105
+        },
+        {
+          "name": "stripIntroGreeting",
+          "line": 277
+        }
+      ],
+      "exports": [
+        "extractMemoryFacts",
+        "isContextualNameCandidate",
+        "isEvidenceBackedUserName",
+        "isExpectingNameFromRecentMessages",
+        "isExplicitNameOnlyMessage",
+        "isNonNameOnboardingReply",
+        "isStandaloneGreeting",
+        "normalizeMemoryFactValue",
+        "normalizeMemoryFacts"
+      ],
+      "imports": [
+        "src/preferred-location-v1.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 16
+    },
+    {
+      "path": "src/openai-reasoning.js",
+      "layer": "answer",
+      "lines": 531,
+      "functions": [
+        {
+          "name": "buildLunaAnswerContextV12",
+          "line": 252
+        },
+        {
+          "name": "compactEvidenceText",
+          "line": 70
+        },
+        {
+          "name": "compactReasoningEvidence",
+          "line": 91
+        },
+        {
+          "name": "compactSourceItems",
+          "line": 79
+        },
+        {
+          "name": "extractOutputText",
+          "line": 38
+        },
+        {
+          "name": "generatePrimaAnswer",
+          "line": 281
+        },
+        {
+          "name": "getReasoningEffort",
+          "line": 10
+        },
+        {
+          "name": "shouldUseOpenAI",
+          "line": 29
+        }
+      ],
+      "exports": [
+        "buildLunaAnswerContextV12",
+        "generatePrimaAnswer",
+        "shouldUseOpenAI"
+      ],
+      "imports": [
+        "src/persona-runtime.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 8
+    },
+    {
+      "path": "src/pagination-fastpath-v1.js",
+      "layer": "other",
+      "lines": 52,
+      "functions": [
+        {
+          "name": "prepareFastProjectPaginationV1",
+          "line": 7
+        }
+      ],
+      "exports": [
+        "prepareFastProjectPaginationV1"
+      ],
+      "imports": [
+        "src/search-response.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 1
+    },
+    {
+      "path": "src/persona-runtime.js",
+      "layer": "other",
+      "lines": 151,
+      "functions": [
+        {
+          "name": "buildPersonaInstructions",
+          "line": 76
+        }
+      ],
+      "exports": [
+        "buildPersonaInstructions"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 1
+    },
+    {
+      "path": "src/persona-semantic-a1.js",
+      "layer": "routing_core",
+      "lines": 529,
+      "functions": [
+        {
+          "name": "buildInstructions",
+          "line": 69
+        },
+        {
+          "name": "buildPurePersonaInstructions",
+          "line": 188
+        },
+        {
+          "name": "compactInput",
+          "line": 309
+        },
+        {
+          "name": "contains",
+          "line": 97
+        },
+        {
+          "name": "cut",
+          "line": 255
+        },
+        {
+          "name": "dialogueInstructions",
+          "line": 291
+        },
+        {
+          "name": "eligible",
+          "line": 303
+        },
+        {
+          "name": "founderContextRelevant",
+          "line": 58
+        },
+        {
+          "name": "generate",
+          "line": 416
+        },
+        {
+          "name": "hasConcreteBuyerTask",
+          "line": 151
+        },
+        {
+          "name": "interpretationForRoute",
+          "line": 383
+        },
+        {
+          "name": "isComplexFirstTurnDialogue",
+          "line": 265
+        },
+        {
+          "name": "looksLikeExternalTask",
+          "line": 141
+        },
+        {
+          "name": "looksLikePersonalUpdate",
+          "line": 137
+        },
+        {
+          "name": "outputText",
+          "line": 376
+        },
+        {
+          "name": "recentPersonaContext",
+          "line": 98
+        },
+        {
+          "name": "redact",
+          "line": 256
+        },
+        {
+          "name": "requiresStructuredBuyerUnderstanding",
+          "line": 166
+        },
+        {
+          "name": "selectPersonaSections",
+          "line": 108
+        },
+        {
+          "name": "usePurePersona",
+          "line": 178
+        }
+      ],
+      "exports": [
+        "compactInput",
+        "eligible",
+        "generate",
+        "isComplexFirstTurnDialogue",
+        "requiresStructuredBuyerUnderstanding"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 20
+    },
+    {
+      "path": "src/preferred-location-v1.js",
+      "layer": "other",
+      "lines": 29,
+      "functions": [
+        {
+          "name": "normalizePreferredLocationTextV1",
+          "line": 8
+        }
+      ],
+      "exports": [
+        "normalizePreferredLocationTextV1"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 1
+    },
+    {
+      "path": "src/prima-lead-handoff-i31.js",
+      "layer": "commercial_safety",
+      "lines": 117,
+      "functions": [
+        {
+          "name": "clean",
+          "line": 10
+        },
+        {
+          "name": "deriveHandoffI31",
+          "line": 49
+        },
+        {
+          "name": "isExplicitContactRequest",
+          "line": 22
+        },
+        {
+          "name": "prepareLeadHandoffContextI31",
+          "line": 76
+        },
+        {
+          "name": "projectCandidateI31",
+          "line": 34
+        },
+        {
+          "name": "serviceFromText",
+          "line": 13
+        },
+        {
+          "name": "short",
+          "line": 11
+        }
+      ],
+      "exports": [
+        "deriveHandoffI31",
+        "prepareLeadHandoffContextI31",
+        "projectCandidateI31"
+      ],
+      "imports": [
+        "src/entity-resolver.js",
+        "src/supabase.js"
+      ],
+      "static_import_count": 2,
+      "function_count": 7
+    },
+    {
+      "path": "src/prima-lead.js",
+      "layer": "commercial_safety",
+      "lines": 739,
+      "functions": [
+        {
+          "name": "buildFunnelContext",
+          "line": 242
+        },
+        {
+          "name": "buildPrimaLeadRpcPayload",
+          "line": 365
+        },
+        {
+          "name": "buildProjectDecisions",
+          "line": 148
+        },
+        {
+          "name": "buildRequestSummary",
+          "line": 290
+        },
+        {
+          "name": "buildRequirements",
+          "line": 113
+        },
+        {
+          "name": "buildSearchProjects",
+          "line": 217
+        },
+        {
+          "name": "factMap",
+          "line": 25
+        },
+        {
+          "name": "persistPrimaLeadV1",
+          "line": 649
+        },
+        {
+          "name": "requirementValue",
+          "line": 88
+        },
+        {
+          "name": "text",
+          "line": 50
+        },
+        {
+          "name": "uuid",
+          "line": 70
+        }
+      ],
+      "exports": [
+        "buildPrimaLeadRpcPayload",
+        "persistPrimaLeadV1"
+      ],
+      "imports": [
+        "src/memory-store.js",
+        "src/preferred-location-v1.js",
+        "src/prima-lead-handoff-i31.js",
+        "src/supabase.js"
+      ],
+      "static_import_count": 4,
+      "function_count": 11
+    },
+    {
+      "path": "src/prima-search-request.js",
+      "layer": "search_recommendation",
+      "lines": 764,
+      "functions": [
+        {
+          "name": "augmentSearchQueryWithMemory",
+          "line": 216
+        },
+        {
+          "name": "buildPrimaSearchRequest",
+          "line": 642
+        },
+        {
+          "name": "completedSearchContext",
+          "line": 17
+        },
+        {
+          "name": "contextualSearchQuery",
+          "line": 47
+        },
+        {
+          "name": "explicitMaxBudgetContinuation",
+          "line": 395
+        },
+        {
+          "name": "firstValid",
+          "line": 553
+        },
+        {
+          "name": "hasFact",
+          "line": 472
+        },
+        {
+          "name": "humanizeSlug",
+          "line": 2
+        },
+        {
+          "name": "memoryValue",
+          "line": 126
+        },
+        {
+          "name": "personalizedRecommendationV1",
+          "line": 525
+        },
+        {
+          "name": "put",
+          "line": 359
+        },
+        {
+          "name": "recommendationNeedsSearch",
+          "line": 155
+        },
+        {
+          "name": "saved",
+          "line": 544
+        },
+        {
+          "name": "validatedLunaRefinementQueryV12",
+          "line": 607
+        },
+        {
+          "name": "withVerifiedSearchSlotsV1",
+          "line": 351
+        }
+      ],
+      "exports": [
+        "buildPrimaSearchRequest"
+      ],
+      "imports": [
+        "src/preferred-location-v1.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 15
+    },
+    {
+      "path": "src/profile-update-v1.js",
+      "layer": "other",
+      "lines": 101,
+      "functions": [
+        {
+          "name": "buildBuyerProfileAcknowledgementV1",
+          "line": 77
+        },
+        {
+          "name": "classifyPureBuyerProfileUpdateV1",
+          "line": 32
+        },
+        {
+          "name": "duration",
+          "line": 23
+        },
+        {
+          "name": "memoryValue",
+          "line": 72
+        }
+      ],
+      "exports": [
+        "buildBuyerProfileAcknowledgementV1",
+        "classifyPureBuyerProfileUpdateV1"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 4
+    },
+    {
+      "path": "src/recommendation-criteria.js",
+      "layer": "search_recommendation",
+      "lines": 355,
+      "functions": [
+        {
+          "name": "analyzeRecommendationCriteriaV1",
+          "line": 73
+        },
+        {
+          "name": "budgetNumber",
+          "line": 218
+        },
+        {
+          "name": "candidateValue",
+          "line": 35
+        },
+        {
+          "name": "isKnown",
+          "line": 25
+        },
+        {
+          "name": "memoryFact",
+          "line": 179
+        },
+        {
+          "name": "pick",
+          "line": 176
+        },
+        {
+          "name": "recommendationKnownConstraintsV1",
+          "line": 164
+        },
+        {
+          "name": "validBudget",
+          "line": 196
+        }
+      ],
+      "exports": [
+        "analyzeRecommendationCriteriaV1",
+        "recommendationKnownConstraintsV1"
+      ],
+      "imports": [
+        "src/preferred-location-v1.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 8
+    },
+    {
+      "path": "src/request-interpreter.js",
+      "layer": "routing_core",
+      "lines": 666,
+      "functions": [
+        {
+          "name": "buildInput",
+          "line": 428
+        },
+        {
+          "name": "compactConversation",
+          "line": 400
+        },
+        {
+          "name": "compactMemory",
+          "line": 378
+        },
+        {
+          "name": "extractOutputText",
+          "line": 349
+        },
+        {
+          "name": "instructions",
+          "line": 483
+        },
+        {
+          "name": "interpretRequest",
+          "line": 498
+        },
+        {
+          "name": "safeText",
+          "line": 406
+        }
+      ],
+      "exports": [
+        "interpretRequest"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 7
+    },
+    {
+      "path": "src/return-session-v1.js",
+      "layer": "other",
+      "lines": 126,
+      "functions": [
+        {
+          "name": "cookieNameForRequest",
+          "line": 39
+        },
+        {
+          "name": "primaCredentialedJsonV1",
+          "line": 100
+        },
+        {
+          "name": "primaIssueReturnCookieV1",
+          "line": 72
+        },
+        {
+          "name": "primaReadReturnSessionV1",
+          "line": 82
+        },
+        {
+          "name": "primaReturnTrustedOriginV1",
+          "line": 17
+        },
+        {
+          "name": "primaTrustedPreflightHeadersV1",
+          "line": 117
+        },
+        {
+          "name": "sessionSecret",
+          "line": 50
+        },
+        {
+          "name": "signValue",
+          "line": 60
+        }
+      ],
+      "exports": [
+        "primaCredentialedJsonV1",
+        "primaIssueReturnCookieV1",
+        "primaReadReturnSessionV1",
+        "primaReturnTrustedOriginV1",
+        "primaTrustedPreflightHeadersV1"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 8
+    },
+    {
+      "path": "src/router.js",
+      "layer": "routing_core",
+      "lines": 502,
+      "functions": [
+        {
+          "name": "classifyClearlyOffTopicRequest",
+          "line": 7
+        },
+        {
+          "name": "hasConversationContext",
+          "line": 24
+        },
+        {
+          "name": "hasPageContext",
+          "line": 35
+        },
+        {
+          "name": "routeIntent",
+          "line": 45
+        }
+      ],
+      "exports": [
+        "classifyClearlyOffTopicRequest",
+        "routeIntent"
+      ],
+      "imports": [
+        "src/fast-gate.js",
+        "src/memory.js"
+      ],
+      "static_import_count": 2,
+      "function_count": 4
+    },
+    {
+      "path": "src/search-context.js",
+      "layer": "search_recommendation",
+      "lines": 441,
+      "functions": [
+        {
+          "name": "budget",
+          "line": 43
+        },
+        {
+          "name": "list",
+          "line": 32
+        },
+        {
+          "name": "normalizeE24EntitySearchContextV1",
+          "line": 159
+        },
+        {
+          "name": "normalizeSearchContextV1",
+          "line": 247
+        },
+        {
+          "name": "number",
+          "line": 16
+        },
+        {
+          "name": "result",
+          "line": 78
+        },
+        {
+          "name": "text",
+          "line": 3
+        }
+      ],
+      "exports": [
+        "normalizeSearchContextV1"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 7
+    },
+    {
+      "path": "src/search-knowledge.js",
+      "layer": "knowledge_entity",
+      "lines": 429,
+      "functions": [
+        {
+          "name": "mergeSearchCandidateKnowledge",
+          "line": 301
+        },
+        {
+          "name": "normalizeBlock",
+          "line": 81
+        },
+        {
+          "name": "normalizeSearchKnowledgeResult",
+          "line": 168
+        },
+        {
+          "name": "resolveSearchCandidateKnowledge",
+          "line": 242
+        },
+        {
+          "name": "shouldResolveSearchCandidateKnowledge",
+          "line": 62
+        },
+        {
+          "name": "unique",
+          "line": 290
+        },
+        {
+          "name": "validSearchSlugs",
+          "line": 14
+        }
+      ],
+      "exports": [
+        "mergeSearchCandidateKnowledge",
+        "normalizeSearchKnowledgeResult",
+        "resolveSearchCandidateKnowledge",
+        "shouldResolveSearchCandidateKnowledge"
+      ],
+      "imports": [
+        "src/supabase.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 7
+    },
+    {
+      "path": "src/search-response.js",
+      "layer": "answer",
+      "lines": 394,
+      "functions": [
+        {
+          "name": "buildSearchRouteResponse",
+          "line": 198
+        },
+        {
+          "name": "buildVerifiedEntitySearchResponseV5",
+          "line": 129
+        },
+        {
+          "name": "cardRefs",
+          "line": 47
+        },
+        {
+          "name": "recommendationPageSize",
+          "line": 33
+        },
+        {
+          "name": "validSearch",
+          "line": 4
+        }
+      ],
+      "exports": [
+        "buildSearchRouteResponse"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 5
+    },
+    {
+      "path": "src/structured-answer.js",
+      "layer": "answer",
+      "lines": 568,
+      "functions": [
+        {
+          "name": "buildStructuredAnswer",
+          "line": 416
+        },
+        {
+          "name": "fallbackFacts",
+          "line": 227
+        },
+        {
+          "name": "findFact",
+          "line": 25
+        },
+        {
+          "name": "getKeyFacts",
+          "line": 1
+        },
+        {
+          "name": "humanFactLabel",
+          "line": 407
+        },
+        {
+          "name": "humanizeSlug",
+          "line": 82
+        },
+        {
+          "name": "relationValueForFact",
+          "line": 309
+        },
+        {
+          "name": "subjectName",
+          "line": 98
+        },
+        {
+          "name": "valueOf",
+          "line": 52
+        }
+      ],
+      "exports": [
+        "buildStructuredAnswer"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 9
+    },
+    {
+      "path": "src/supabase.js",
+      "layer": "other",
+      "lines": 432,
+      "functions": [
+        {
+          "name": "fetchReadWithRetry",
+          "line": 14
+        },
+        {
+          "name": "headers",
+          "line": 1
+        },
+        {
+          "name": "supabaseInsert",
+          "line": 48
+        },
+        {
+          "name": "supabaseInsertIdempotentEvent",
+          "line": 181
+        },
+        {
+          "name": "supabaseInsertIdempotentMessage",
+          "line": 78
+        },
+        {
+          "name": "supabasePublicRpc",
+          "line": 396
+        },
+        {
+          "name": "supabaseRpc",
+          "line": 362
+        },
+        {
+          "name": "supabaseSelect",
+          "line": 336
+        },
+        {
+          "name": "supabaseUpdate",
+          "line": 271
+        },
+        {
+          "name": "supabaseUpdateReturning",
+          "line": 299
+        }
+      ],
+      "exports": [
+        "supabaseInsert",
+        "supabaseInsertIdempotentEvent",
+        "supabaseInsertIdempotentMessage",
+        "supabasePublicRpc",
+        "supabaseRpc",
+        "supabaseSelect",
+        "supabaseUpdate",
+        "supabaseUpdateReturning"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 10
+    },
+    {
+      "path": "src/tool-registry.js",
+      "layer": "knowledge_entity",
+      "lines": 110,
+      "functions": [
+        {
+          "name": "canUseTool",
+          "line": 101
+        },
+        {
+          "name": "getAllowedTools",
+          "line": 85
+        },
+        {
+          "name": "getToolIds",
+          "line": 107
+        }
+      ],
+      "exports": [
+        "TOOL_REGISTRY_V1",
+        "canUseTool",
+        "getAllowedTools",
+        "getToolIds"
+      ],
+      "imports": [],
+      "static_import_count": 0,
+      "function_count": 3
+    },
+    {
+      "path": "tests/router-regression-p1.mjs",
+      "layer": "test",
+      "lines": 50,
+      "functions": [],
+      "exports": [],
+      "imports": [
+        "src/router.js"
+      ],
+      "static_import_count": 1,
+      "function_count": 0
+    }
+  ],
+  "edges": [
+    {
+      "from": "scripts/qa-card-facts-v1.mjs",
+      "to": "src/card-facts.js"
+    },
+    {
+      "from": "scripts/qa-contact-capture-v1.mjs",
+      "to": "src/contact-capture.js"
+    },
+    {
+      "from": "scripts/qa-contextual-name-memory.mjs",
+      "to": "src/memory.js"
+    },
+    {
+      "from": "scripts/qa-day2-knowledge-planner.mjs",
+      "to": "src/knowledge-planner.js"
+    },
+    {
+      "from": "scripts/qa-decision-persona-bridge.mjs",
+      "to": "src/decision-policy.js"
+    },
+    {
+      "from": "scripts/qa-entity-decision-memory.mjs",
+      "to": "src/entity-decision-memory.js"
+    },
+    {
+      "from": "scripts/qa-funnel-v1.mjs",
+      "to": "src/funnel.js"
+    },
+    {
+      "from": "scripts/qa-memory-v1.mjs",
+      "to": "src/memory.js"
+    },
+    {
+      "from": "scripts/qa-persona-local.mjs",
+      "to": "src/local-responses.js"
+    },
+    {
+      "from": "scripts/qa-persona-local.mjs",
+      "to": "src/router.js"
+    },
+    {
+      "from": "scripts/qa-persona-runtime.mjs",
+      "to": "src/persona-runtime.js"
+    },
+    {
+      "from": "scripts/qa-prima-lead-v1.mjs",
+      "to": "src/contact-capture.js"
+    },
+    {
+      "from": "scripts/qa-prima-lead-v1.mjs",
+      "to": "src/prima-lead.js"
+    },
+    {
+      "from": "scripts/qa-prima-search-request-v1.mjs",
+      "to": "src/prima-search-request.js"
+    },
+    {
+      "from": "scripts/qa-search-context-v1.mjs",
+      "to": "src/context.js"
+    },
+    {
+      "from": "scripts/qa-search-context-v1.mjs",
+      "to": "src/evidence-pack.js"
+    },
+    {
+      "from": "scripts/qa-search-context-v1.mjs",
+      "to": "src/search-context.js"
+    },
+    {
+      "from": "scripts/qa-search-response-v1.mjs",
+      "to": "src/search-response.js"
+    },
+    {
+      "from": "src/card-facts.js",
+      "to": "src/supabase.js"
+    },
+    {
+      "from": "src/context.js",
+      "to": "src/search-context.js"
+    },
+    {
+      "from": "src/context.js",
+      "to": "src/supabase.js"
+    },
+    {
+      "from": "src/conversation-move.js",
+      "to": "src/follow-up.js"
+    },
+    {
+      "from": "src/conversation-state.js",
+      "to": "src/compare.js"
+    },
+    {
+      "from": "src/conversation-state.js",
+      "to": "src/preferred-location-v1.js"
+    },
+    {
+      "from": "src/developer-search-preview-v1.js",
+      "to": "src/developer-discovery-v1.js"
+    },
+    {
+      "from": "src/developer-search-preview-v1.js",
+      "to": "src/developer-project-groups-v1.js"
+    },
+    {
+      "from": "src/developer-search-preview-v1.js",
+      "to": "src/supabase.js"
+    },
+    {
+      "from": "src/district-budget-search-v1.js",
+      "to": "src/district-emirates-v1.js"
+    },
+    {
+      "from": "src/district-combined-search-v1.js",
+      "to": "src/district-budget-search-v1.js"
+    },
+    {
+      "from": "src/district-combined-search-v1.js",
+      "to": "src/district-intelligence-search-v1.js"
+    },
+    {
+      "from": "src/district-developer-search-v1.js",
+      "to": "src/district-budget-search-v1.js"
+    },
+    {
+      "from": "src/district-developer-search-v1.js",
+      "to": "src/district-emirates-v1.js"
+    },
+    {
+      "from": "src/district-developer-search-v1.js",
+      "to": "src/district-intelligence-search-v1.js"
+    },
+    {
+      "from": "src/district-discovery-v1.js",
+      "to": "src/district-emirates-v1.js"
+    },
+    {
+      "from": "src/district-intelligence-search-v1.js",
+      "to": "src/district-emirates-v1.js"
+    },
+    {
+      "from": "src/district-intelligence-search-v1.js",
+      "to": "src/district-intelligence-v1.js"
+    },
+    {
+      "from": "src/district-search-preview-v1.js",
+      "to": "src/district-budget-search-v1.js"
+    },
+    {
+      "from": "src/district-search-preview-v1.js",
+      "to": "src/district-combined-search-v1.js"
+    },
+    {
+      "from": "src/district-search-preview-v1.js",
+      "to": "src/district-developer-search-v1.js"
+    },
+    {
+      "from": "src/district-search-preview-v1.js",
+      "to": "src/district-discovery-v1.js"
+    },
+    {
+      "from": "src/district-search-preview-v1.js",
+      "to": "src/district-intelligence-search-v1.js"
+    },
+    {
+      "from": "src/district-search-preview-v1.js",
+      "to": "src/supabase.js"
+    },
+    {
+      "from": "src/entity-decision-memory.js",
+      "to": "src/follow-up.js"
+    },
+    {
+      "from": "src/entity-resolver.js",
+      "to": "src/supabase.js"
+    },
+    {
+      "from": "src/funnel.js",
+      "to": "src/commercial-decision.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/card-facts.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/commercial-context.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/compare.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/contact-capture.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/contact-first-turn-intro-h34.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/contact-handoff-presentation.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/contact-received-fastpath-i32.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/context.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/conversation-access.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/conversation-move.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/conversation-ordering.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/conversation-state.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/conversation-turn.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/decision-policy.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/developer-discovery-v1.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/developer-search-preview-v1.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/direct-contact-intent-h29.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/district-search-preview-v1.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/entity-decision-memory.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/entity-resolver.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/evidence-pack.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/fast-gate.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/funnel.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/grounded-fallback.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/knowledge.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/local-responses.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/memory-store.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/memory.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/openai-reasoning.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/pagination-fastpath-v1.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/persona-semantic-a1.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/prima-lead.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/prima-search-request.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/profile-update-v1.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/recommendation-criteria.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/request-interpreter.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/return-session-v1.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/router.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/search-context.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/search-knowledge.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/search-response.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/structured-answer.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/supabase.js"
+    },
+    {
+      "from": "src/index.js",
+      "to": "src/tool-registry.js"
+    },
+    {
+      "from": "src/knowledge-cross-page.js",
+      "to": "src/knowledge-adapters.js"
+    },
+    {
+      "from": "src/knowledge-cross-page.js",
+      "to": "src/supabase.js"
+    },
+    {
+      "from": "src/knowledge.js",
+      "to": "src/compare.js"
+    },
+    {
+      "from": "src/knowledge.js",
+      "to": "src/knowledge-adapters.js"
+    },
+    {
+      "from": "src/knowledge.js",
+      "to": "src/knowledge-cross-page.js"
+    },
+    {
+      "from": "src/knowledge.js",
+      "to": "src/knowledge-planner.js"
+    },
+    {
+      "from": "src/knowledge.js",
+      "to": "src/supabase.js"
+    },
+    {
+      "from": "src/local-responses.js",
+      "to": "src/follow-up.js"
+    },
+    {
+      "from": "src/local-responses.js",
+      "to": "src/router.js"
+    },
+    {
+      "from": "src/locales/_shared/request-envelope.mjs",
+      "to": "src/locales/_shared/locale-registry.mjs"
+    },
+    {
+      "from": "src/locales/ru/runtime/card-facts.js",
+      "to": "src/supabase.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/context.js",
+      "to": "src/locales/ru/runtime/search-context.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/context.js",
+      "to": "src/supabase.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/conversation-state.js",
+      "to": "src/compare.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/conversation-state.js",
+      "to": "src/preferred-location-v1.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/developer-search-preview-v1.js",
+      "to": "src/locales/ru/runtime/developer-discovery-v1.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/developer-search-preview-v1.js",
+      "to": "src/locales/ru/runtime/developer-project-groups-v1.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/developer-search-preview-v1.js",
+      "to": "src/supabase.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/district-budget-search-v1.js",
+      "to": "src/district-emirates-v1.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/district-combined-search-v1.js",
+      "to": "src/locales/ru/runtime/district-budget-search-v1.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/district-combined-search-v1.js",
+      "to": "src/locales/ru/runtime/district-intelligence-search-v1.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/district-developer-search-v1.js",
+      "to": "src/district-emirates-v1.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/district-developer-search-v1.js",
+      "to": "src/locales/ru/runtime/district-budget-search-v1.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/district-developer-search-v1.js",
+      "to": "src/locales/ru/runtime/district-intelligence-search-v1.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/district-discovery-v1.js",
+      "to": "src/district-emirates-v1.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/district-intelligence-search-v1.js",
+      "to": "src/district-emirates-v1.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/district-intelligence-search-v1.js",
+      "to": "src/district-intelligence-v1.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/district-search-preview-v1.js",
+      "to": "src/locales/ru/runtime/district-budget-search-v1.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/district-search-preview-v1.js",
+      "to": "src/locales/ru/runtime/district-combined-search-v1.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/district-search-preview-v1.js",
+      "to": "src/locales/ru/runtime/district-developer-search-v1.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/district-search-preview-v1.js",
+      "to": "src/locales/ru/runtime/district-discovery-v1.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/district-search-preview-v1.js",
+      "to": "src/locales/ru/runtime/district-intelligence-search-v1.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/district-search-preview-v1.js",
+      "to": "src/supabase.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/funnel.js",
+      "to": "src/commercial-decision.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/commercial-context.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/compare.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/contact-first-turn-intro-h34.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/contact-received-fastpath-i32.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/conversation-access.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/conversation-move.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/conversation-ordering.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/conversation-turn.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/decision-policy.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/direct-contact-intent-h29.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/entity-decision-memory.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/entity-resolver.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/evidence-pack.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/knowledge.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/locales/ru/runtime/card-facts.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/locales/ru/runtime/contact-capture.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/locales/ru/runtime/contact-handoff-presentation.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/locales/ru/runtime/context.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/locales/ru/runtime/conversation-state.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/locales/ru/runtime/developer-discovery-v1.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/locales/ru/runtime/developer-search-preview-v1.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/locales/ru/runtime/district-search-preview-v1.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/locales/ru/runtime/fast-gate.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/locales/ru/runtime/funnel.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/locales/ru/runtime/grounded-fallback.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/locales/ru/runtime/local-responses.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/locales/ru/runtime/openai-reasoning.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/locales/ru/runtime/persona-semantic-a1.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/locales/ru/runtime/prima-lead.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/locales/ru/runtime/prima-search-request.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/locales/ru/runtime/profile-update-v1.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/locales/ru/runtime/request-interpreter.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/locales/ru/runtime/return-session-v1.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/locales/ru/runtime/router.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/locales/ru/runtime/ru-routing-v1.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/locales/ru/runtime/search-knowledge.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/locales/ru/runtime/search-response.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/locales/ru/runtime/structured-answer.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/locales/ru/runtime/tool-registry.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/memory-store.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/memory.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/recommendation-criteria.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/index.js",
+      "to": "src/supabase.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/local-responses.js",
+      "to": "src/follow-up.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/local-responses.js",
+      "to": "src/locales/ru/runtime/router.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/openai-reasoning.js",
+      "to": "src/locales/ru/runtime/persona-runtime.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/prima-lead-handoff-i31.js",
+      "to": "src/entity-resolver.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/prima-lead-handoff-i31.js",
+      "to": "src/supabase.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/prima-lead.js",
+      "to": "src/locales/ru/runtime/prima-lead-handoff-i31.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/prima-lead.js",
+      "to": "src/memory-store.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/prima-lead.js",
+      "to": "src/preferred-location-v1.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/prima-lead.js",
+      "to": "src/supabase.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/prima-search-request.js",
+      "to": "src/preferred-location-v1.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/router.js",
+      "to": "src/locales/ru/runtime/fast-gate.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/router.js",
+      "to": "src/memory.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/ru-routing-v1.js",
+      "to": "src/locales/ru/runtime/router.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/ru-routing-v1.js",
+      "to": "src/locales/ru/runtime/ru-intent-v1.js"
+    },
+    {
+      "from": "src/locales/ru/runtime/search-knowledge.js",
+      "to": "src/supabase.js"
+    },
+    {
+      "from": "src/memory-store.js",
+      "to": "src/memory.js"
+    },
+    {
+      "from": "src/memory-store.js",
+      "to": "src/supabase.js"
+    },
+    {
+      "from": "src/memory.js",
+      "to": "src/preferred-location-v1.js"
+    },
+    {
+      "from": "src/openai-reasoning.js",
+      "to": "src/persona-runtime.js"
+    },
+    {
+      "from": "src/pagination-fastpath-v1.js",
+      "to": "src/search-response.js"
+    },
+    {
+      "from": "src/prima-lead-handoff-i31.js",
+      "to": "src/entity-resolver.js"
+    },
+    {
+      "from": "src/prima-lead-handoff-i31.js",
+      "to": "src/supabase.js"
+    },
+    {
+      "from": "src/prima-lead.js",
+      "to": "src/memory-store.js"
+    },
+    {
+      "from": "src/prima-lead.js",
+      "to": "src/preferred-location-v1.js"
+    },
+    {
+      "from": "src/prima-lead.js",
+      "to": "src/prima-lead-handoff-i31.js"
+    },
+    {
+      "from": "src/prima-lead.js",
+      "to": "src/supabase.js"
+    },
+    {
+      "from": "src/prima-search-request.js",
+      "to": "src/preferred-location-v1.js"
+    },
+    {
+      "from": "src/recommendation-criteria.js",
+      "to": "src/preferred-location-v1.js"
+    },
+    {
+      "from": "src/router.js",
+      "to": "src/fast-gate.js"
+    },
+    {
+      "from": "src/router.js",
+      "to": "src/memory.js"
+    },
+    {
+      "from": "src/search-knowledge.js",
+      "to": "src/supabase.js"
+    },
+    {
+      "from": "tests/router-regression-p1.mjs",
+      "to": "src/router.js"
+    }
+  ],
+  "unresolved_imports": [
+    {
+      "source": "src/local-responses.js",
+      "specifier": "../contracts/prima-persona-v1.json"
+    },
+    {
+      "source": "src/locales/ru/runtime/local-responses.js",
+      "specifier": "../contracts/prima-persona-v1.json"
+    },
+    {
+      "source": "src/locales/ru/runtime/persona-runtime.js",
+      "specifier": "../contracts/prima-persona-v1.json"
+    },
+    {
+      "source": "src/locales/ru/runtime/persona-semantic-a1.js",
+      "specifier": "../contracts/prima-persona-v1.json"
+    },
+    {
+      "source": "src/persona-runtime.js",
+      "specifier": "../contracts/prima-persona-v1.json"
+    },
+    {
+      "source": "src/persona-semantic-a1.js",
+      "specifier": "../contracts/prima-persona-v1.json"
+    }
+  ],
+  "potentially_unlinked": [
+    "src/locales/_shared/entity-aliases.mjs",
+    "src/locales/_shared/request-envelope.mjs",
+    "src/locales/ru/runtime/index.js"
+  ],
+  "external_package_imports": {
+    "node:fs": 1,
+    "file:": 1,
+    "node:assert": 2,
+    "libphonenumber-js": 2
+  }
+}

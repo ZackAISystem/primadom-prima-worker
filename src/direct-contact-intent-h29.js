@@ -1,3 +1,4 @@
+import { isInformationalContactInquiryV1, isDeferredContactSubmissionV1 } from "./contact-routing-safety-v1.js";
 // H29 — confirmed direct human-contact request from the user's own message.
 // An explicit request to reach the client is separate from channel preferences.
 // This is a narrow authorization signal, not a replacement for Router/Persona.
@@ -9,7 +10,7 @@ function clean(message) {
 export function inspectDirectContactH29(message = "") {
   const text = clean(message);
   const empty = { direct_request: false, preferred_channel: null, introduced_name: null };
-  if (!text || text.length > 2000) return empty;
+  if (!text || text.length > 2000 || isInformationalContactInquiryV1(text) || isDeferredContactSubmissionV1(text)) return empty;
 
   // An explicit prohibition on contact is never authorization. A prohibition
   // on PHONE calls alone is a channel restriction, not a general opt-out.

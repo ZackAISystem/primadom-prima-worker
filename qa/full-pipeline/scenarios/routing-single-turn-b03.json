@@ -1,0 +1,190 @@
+{
+  "contract": "PRIMA_ROUTING_SINGLE_TURN_B03",
+  "scope": "ONE_INITIAL_MESSAGE_PER_FRESH_CONVERSATION",
+  "scenario_count": 10,
+  "notes": [
+    "Expected route/action hypotheses; ambiguous case judgments require review",
+    "Single-turn context tests are intra-message only, NOT multi-turn memory",
+    "No lead creation consent; contact cases explicitly disallow CONTACT"
+  ],
+  "scenarios": [
+    {
+      "id": "S21",
+      "group": "single_turn_context",
+      "category": "self_correction_bedrooms",
+      "message": "I want to buy a two-bedroom apartment in Dubai Hills Estate. Correction: make that three bedrooms, under AED 4 million.",
+      "expected_actions": [
+        "SEARCH"
+      ],
+      "expected_routes": [
+        "property_search"
+      ],
+      "must_not_actions": [
+        "CONTACT"
+      ]
+    },
+    {
+      "id": "S22",
+      "group": "single_turn_context",
+      "category": "self_correction_location",
+      "message": "Find an apartment in Dubai Marina under AED 2 million. Actually, change the location to JLT instead.",
+      "expected_actions": [
+        "SEARCH"
+      ],
+      "expected_routes": [
+        "property_search"
+      ],
+      "must_not_actions": [
+        "CONTACT"
+      ]
+    },
+    {
+      "id": "S23",
+      "group": "single_turn_context",
+      "category": "same_message_reference",
+      "message": "I am deciding between an apartment and a townhouse. Compare those two options for a family with children in Dubai.",
+      "expected_actions": [
+        "COMPARE",
+        "ADVISORY",
+        "KNOWLEDGE_QA"
+      ],
+      "expected_routes": [
+        "compare",
+        "recommendation",
+        "market_question"
+      ],
+      "must_not_actions": [
+        "CONTACT"
+      ]
+    },
+    {
+      "id": "S24",
+      "group": "single_turn_context",
+      "category": "question_revised_same_turn",
+      "message": "Find two-bedroom off-plan apartments in Dubai. On second thought, do not search: explain the risks of buying off-plan instead.",
+      "expected_actions": [
+        "KNOWLEDGE_QA",
+        "ADVISORY"
+      ],
+      "expected_routes": [
+        "market_question",
+        "recommendation",
+        "page_question"
+      ],
+      "must_not_actions": [
+        "SEARCH",
+        "CONTACT"
+      ]
+    },
+    {
+      "id": "S25",
+      "group": "single_turn_context",
+      "category": "qualifier_after_initial_ask",
+      "message": "I need information about Emaar. Specifically, explain what buyers should verify about a developer before paying a booking fee.",
+      "expected_actions": [
+        "KNOWLEDGE_QA",
+        "ADVISORY",
+        "EXACT_FACT"
+      ],
+      "expected_routes": [
+        "market_question",
+        "exact_fact",
+        "recommendation",
+        "page_question"
+      ],
+      "must_not_actions": [
+        "SEARCH",
+        "CONTACT"
+      ]
+    },
+    {
+      "id": "S26",
+      "group": "routing_conflict",
+      "category": "negative_search_instruction",
+      "message": "I do not want property listings. Explain the difference between gross yield and net yield.",
+      "expected_actions": [
+        "KNOWLEDGE_QA"
+      ],
+      "expected_routes": [
+        "market_question",
+        "page_question"
+      ],
+      "must_not_actions": [
+        "SEARCH",
+        "CONTACT"
+      ]
+    },
+    {
+      "id": "S27",
+      "group": "routing_conflict",
+      "category": "quoted_contact_request",
+      "message": "A friend wrote the words \"book an agent call\" in a message. Explain what that phrase means, but do not book anything for me.",
+      "expected_actions": [
+        "KNOWLEDGE_QA",
+        "ADVISORY",
+        "CLARIFY"
+      ],
+      "expected_routes": [
+        "market_question",
+        "page_question",
+        "recommendation"
+      ],
+      "must_not_actions": [
+        "CONTACT"
+      ]
+    },
+    {
+      "id": "S28",
+      "group": "routing_conflict",
+      "category": "search_with_contact_prohibition",
+      "message": "Find two-bedroom apartments in Downtown Dubai up to AED 3 million. Do not ask for my phone number or connect me with an agent.",
+      "expected_actions": [
+        "SEARCH"
+      ],
+      "expected_routes": [
+        "property_search"
+      ],
+      "must_not_actions": [
+        "CONTACT"
+      ]
+    },
+    {
+      "id": "S29",
+      "group": "routing_conflict",
+      "category": "budget_without_search_request",
+      "message": "My maximum property budget is AED 2 million. I am not asking you to search; explain how much to reserve for fees and closing costs.",
+      "expected_actions": [
+        "KNOWLEDGE_QA",
+        "ADVISORY"
+      ],
+      "expected_routes": [
+        "market_question",
+        "recommendation",
+        "page_question"
+      ],
+      "must_not_actions": [
+        "SEARCH",
+        "CONTACT"
+      ]
+    },
+    {
+      "id": "S30",
+      "group": "routing_conflict",
+      "category": "quoted_search_phrase_only",
+      "message": "Please explain what the phrase \"find apartments under AED 2 million\" means as a search filter. I do not want you to run the search.",
+      "expected_actions": [
+        "KNOWLEDGE_QA",
+        "ADVISORY"
+      ],
+      "expected_routes": [
+        "market_question",
+        "page_question",
+        "recommendation"
+      ],
+      "must_not_actions": [
+        "SEARCH",
+        "CONTACT"
+      ]
+    }
+  ]
+}

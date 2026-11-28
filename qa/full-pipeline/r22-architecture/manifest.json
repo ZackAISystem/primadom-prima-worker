@@ -1,0 +1,21 @@
+{
+  "version": "R2.2-phase-A",
+  "files": {
+    "src/index.js": {
+      "before_sha256": "69419347fe6aea82e8c8800fe1b0698dcee5b3ac393904fec4b527a1b814db0b",
+      "after_sha256": "095815a17124d2db04e559ee492350d81157ee99c975bee6acca4643fffaabf4"
+    },
+    "src/decision-policy.js": {
+      "before_sha256": "fd0a44f996acfeaf73b2edc7c6a7801c4e4ad3c1e6b7963574f0427e2a66e66e",
+      "after_sha256": "a1af4d532c64d78ac839dfcbe536637c004902ff2005b2e5b4a2aae5edc66849"
+    },
+    "src/entity-resolver.js": {
+      "before_sha256": "4288c136cb3006b28a1ff04bb24aaa664c82edc15101582499d5ccfe183055dc",
+      "after_sha256": "dd6753db258993202c54dff73cac1855971f9081284b3997eaadb2cd894dc9d1"
+    },
+    "src/task-plan-v1.js": {
+      "before_sha256": null,
+      "after_sha256": "69876a6635f9f67f9862458e61712766adea7ce2dc3e553ee30ae9930dc3d5f7"
+    }
+  }
+}

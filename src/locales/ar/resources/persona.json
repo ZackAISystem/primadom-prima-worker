@@ -1,0 +1,7 @@
+{
+  "language": "ar",
+  "status": "awaiting_approved_semantic_translation",
+  "source_contract": "primadom-prima-worker/contracts/prima-persona-v1.json",
+  "overrides": {},
+  "do_not_invent_policy": true
+}

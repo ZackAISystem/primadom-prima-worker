@@ -1,3 +1,5 @@
+import { extractMemoryFacts } from "./memory.js";
+
 /*
  * MEM07: narrow, zero-LLM buyer-profile update gate.
  * This does NOT handle mixed search, advice, compare or contact requests.
@@ -33,11 +35,31 @@ export function classifyPureBuyerProfileUpdateV1(message = '', languageCode = 'e
   const text = String(message || '').trim().replace(/[’]/g, "'");
   if (!text || text.length > 320 || languageCode !== 'en' ||
       ACTION_REQUEST.test(text) || PROPERTY_DISCOVERY.test(text) ||
-      EXTRA_REQUIREMENTS.test(text) || NEGATION.test(text)) {
-    return null;
-  }
+      NEGATION.test(text)) return null;
 
-  const facts = [];
+  // PT05/PT09: the buyer's own ceiling is not a Registry price fact.
+  // Reuse the canonical extractor, including its existing financing key.
+  // "May use a mortgage" is a *tentative* preference (lower confidence),
+  // not proof of mortgage approval or a binding financing decision.
+  const budgetDeclaration = /^(?:my|our)\s+(?:(?:max(?:imum)?\s+)?(?:purchase\s+)?(?:price|budget)|price\s+ceiling)\s+(?:is|of|=)\s*(?:aed|dhs?|dirhams?)\s*[\d.,]+/i.test(text);
+  if (EXTRA_REQUIREMENTS.test(text) && !budgetDeclaration) return null;
+  // The narrow fast-path must not discard additional home/location criteria.
+  // Such mixed requests continue to the existing full Interpreter pipeline.
+  if (budgetDeclaration && /\b(?:bedrooms?|studios?|apartments?|villas?|townhouses?|penthouses?|in\s+[A-Z][a-z]+|near\s+[A-Z][a-z]+)\b/i.test(text)) return null;
+  const extracted = budgetDeclaration ? extractMemoryFacts(text) : [];
+  const budgetFact = extracted.find(f => f?.fact_key === 'budget_max_aed');
+  const facts = budgetFact
+    ? [{fact_key:'budget_max_aed', fact_value:budgetFact.fact_value,
+        confidence:0.98, source:'mem07_explicit_profile'}] : [];
+  const mortgageFact = extracted.find(f =>
+    f?.fact_key === 'financing' && f?.fact_value === 'mortgage');
+  const personalMortgageCue = /\b(?:i|we)\b[^.!?]{0,75}\b(?:mortgage|finance\s+(?:the\s+)?purchase)\b/i.test(text);
+  if (budgetFact && mortgageFact && personalMortgageCue) {
+    const tentative = /\b(?:may|might|could|possibly|perhaps|consider(?:ing)?|thinking\s+about|open\s+to)\b[^.!?]{0,50}\b(?:mortgage|financing)\b/i.test(text);
+    facts.push({fact_key:'financing',fact_value:'mortgage',
+      confidence:tentative ? 0.76 : 0.96,
+      source:tentative ? 'mem07_tentative_financing' : 'mem07_explicit_financing'});
+  }
   const investing =
     /\b(?:i(?:'m| am)|we(?:'re| are))\s+(?:buying|purchasing|investing)\s+(?:a\s+(?:property|home)\s+)?for\s+investment\b/i.test(text) ||
     /\b(?:my|our)\s+(?:purchase\s+)?goal\s+is\s+(?:an?\s+)?investment\b/i.test(text) ||
@@ -86,16 +108,28 @@ export function buildBuyerProfileAcknowledgementV1(facts = [], memory = []) {
   if (priority === 'rental_income') details.push('rental income is your priority');
   if (priority === 'capital_appreciation') details.push('capital appreciation is your priority');
   if (typeof timeline === 'string') details.push(`you plan to buy ${timeline}`);
-  let answer = prefix + details.join('; ') + '.';
+  let answer = details.length
+    ? prefix + details.join('; ') + '.'
+    : prefix + "I'll keep your updated purchase preferences in mind.";
   const property = memoryValue(memory, 'property_type');
   const bedrooms = Number(memoryValue(memory, 'bedrooms'));
   const location = memoryValue(memory, 'preferred_location_text');
   const budget = Number(memoryValue(memory, 'budget_max_aed'));
+  const home = [];
+  if (Number.isInteger(bedrooms) && bedrooms >= 1 && bedrooms <= 20) home.push(`${bedrooms}-bedroom`);
+  if (typeof property === 'string' && /^(apartment|villa|townhouse|penthouse|duplex|studio|plot)$/i.test(property)) home.push(property);
+  if (typeof location === 'string' && location.length <= 70 && !/[\r\n]/.test(location)) home.push(`in ${location}`);
   const prefs = [];
-  if (Number.isInteger(bedrooms) && bedrooms >= 1 && bedrooms <= 20) prefs.push(`${bedrooms}-bedroom`);
-  if (typeof property === 'string' && /^(apartment|villa|townhouse|penthouse|duplex|studio|plot)$/i.test(property)) prefs.push(property);
-  if (typeof location === 'string' && location.length <= 70 && !/[\r\n]/.test(location)) prefs.push(`in ${location}`);
-  if (Number.isFinite(budget) && budget > 0 && budget <= 1e10) prefs.push(`with a maximum budget of AED ${budget.toLocaleString('en-US')}`);
-  if (prefs.length) answer += ` I'll keep your ${prefs.join(' ')} search in mind.`;
+  if (home.length) prefs.push(`${home.join(' ')} preference`);
+  if (Number.isFinite(budget) && budget > 0 && budget <= 1e10)
+    prefs.push(`maximum purchase budget of AED ${budget.toLocaleString('en-US')}`);
+  const finance = [...(Array.isArray(memory) ? memory : [])].reverse()
+    .find(f => f?.fact_key === 'financing');
+  if (finance?.fact_value === 'mortgage') {
+    prefs.push(Number(finance.confidence) < 0.9
+      ? 'mortgage as a possible financing option (not confirmed)'
+      : 'mortgage financing preference');
+  }
+  if (prefs.length) answer += ` Your current preferences: ${prefs.join('; ')}.`;
   return answer;
 }

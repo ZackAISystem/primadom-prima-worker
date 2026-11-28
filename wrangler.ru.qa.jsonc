@@ -1,0 +1,11 @@
+{
+  "name": "primadom-prima-worker-ru-qa",
+  "main": "src/locales/ru/runtime/index.js",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "vars": {
+    "PRIMA_RU_QA": "1",
+    "PRIMA_PERSONA_GENERATIVE_A1": "1",
+    "PRIMA_SEARCH_PRODUCTION": "1"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "contract": "PRIMA_ROUTING_QA_FOCUSED_FIX_R1",
+  "date": "2026-11-23",
+  "source": "PRIMA_ROUTING_30_FULL_EVIDENCE.zip",
+  "changed_files": {
+    "src/router.js": {
+      "original_sha256": "6265e1ae89c1bc9d7040483e74cd3ebfe33be24bab166b84773c4d4de2347510",
+      "patched_sha256": "91e2fb72a689a06a7d2a03e15f5f7402ca4a04ba82183a2f3a04cd14507315e2"
+    },
+    "src/decision-policy.js": {
+      "original_sha256": "67dffaf8e6703ffe2334c4a41b7c36b0bd4e1e32515921ffe4c26a52ff6d8655",
+      "patched_sha256": "23ab3fd633bc6d92eda7c7de0ab24683e7e595a6da669913f9505d220f153d44"
+    },
+    "src/index.js": {
+      "original_sha256": "64a50e24b030c29261c44b0fe2bc56b32e10feeaea292dae4c5a0d1ad12b8653",
+      "patched_sha256": "9aae7624f8873bf7ecf111110bbb16d297147d19b96c74df42e0e15f3c85d09c"
+    },
+    "src/funnel.js": {
+      "original_sha256": "940430a28d73bc0949e35aa75f4a65cde78b60f666293453d65b7f5eded81a1b",
+      "patched_sha256": "32d70e9498fadb81d3dc29346e990a8e492f95643fcfcce1e067e149ecae501b"
+    },
+    "src/direct-contact-intent-h29.js": {
+      "original_sha256": "dfcdd583d21e22d98c16a3aaee49da2214f40657ffbd7db3535fd772c1ec1a62",
+      "patched_sha256": "776bb335fe42373a24f05cbc0c9dbe53e801fcabbeb9923a9c8afe245946af48"
+    }
+  },
+  "new_files": {
+    "src/contact-routing-safety-v1.js": "d06f6119bb0782e468ed5cddee806529b9b74af760af77b725a077b5b726a3c0"
+  },
+  "reference_files": [
+    "src/fast-gate.js",
+    "src/request-interpreter.js",
+    "src/persona-semantic-a1.js",
+    "src/conversation-move.js",
+    "src/contact-capture.js",
+    "src/supabase.js"
+  ],
+  "tests": "qa/routing-fix-r1-tests/qa-routing-fix-r1.mjs",
+  "limitations": [
+    "No full live regression performed",
+    "S04/S19 HTTP 500 still open",
+    "S04/S25 pending spans still open",
+    "Final answer correctness not scored"
+  ]
+}

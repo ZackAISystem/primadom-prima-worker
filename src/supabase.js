@@ -1,3 +1,90 @@
+// PRIMA_QA_RUNTIME_TRACE_R22417 — Opt-in transport envelope only.
+// PT07: Bound only the HTTP transport. SQL, writes, idempotency and
+// persistence decisions remain owned by the existing Supabase modules.
+// A timed-out write is NOT retried: its server-side commit status is unknown.
+async function boundedSupabaseTransportFetch(env, url, options) {
+  const requestedMs = Number(env?.PRIMA_SUPABASE_FETCH_TIMEOUT_MS);
+  const lowerBound = env?.PRIMA_QA_RUNTIME_TRACE === "1" ? 50 : 5000;
+  const timeoutMs = Number.isFinite(requestedMs)
+    && requestedMs >= lowerBound && requestedMs <= 60000
+      ? requestedMs : 30000;
+  const previousSignal = options?.signal;
+  const controller = new AbortController();
+  const relay = () => controller.abort(previousSignal?.reason);
+  if (previousSignal?.aborted) relay();
+  else previousSignal?.addEventListener?.("abort", relay, {once:true});
+  let timer = null;
+  let timedOut = false;
+  const deadline = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+      reject(new Error("supabase_transport_timeout"));
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([
+      fetch(url, {...options, signal:controller.signal}), deadline
+    ]);
+  } catch (error) {
+    if (timedOut) throw new Error("supabase_transport_timeout");
+    throw error;
+  } finally {
+    if (timer !== null) clearTimeout(timer);
+    previousSignal?.removeEventListener?.("abort", relay);
+  }
+}
+
+async function qaSupabaseFetch(env, url, options) {
+  if (env?.PRIMA_QA_RUNTIME_TRACE !== "1") return boundedSupabaseTransportFetch(env,url,options);
+  const path = new URL(url).pathname.split("/").filter(Boolean);
+  const rpc = path.includes("rpc") ? path[path.indexOf("rpc")+1] : null;
+  const table = rpc ? null : path[path.length-1];
+  const method = String(options?.method || "GET").toUpperCase();
+  // Never create actual commercial leads in an instrumented QA run.
+  if (rpc === "create_lead_v1" || table === "leads") {
+    console.info("PRIMA_QA_TRACE",JSON.stringify({version:"R2.24.17",
+      stage:"db_blocked",module:"src/supabase.js",fn:"qaSupabaseFetch",
+      operation:rpc || table,reason:"commercial_lead_protection"}));
+    throw new Error("qa_commercial_lead_blocked");
+  }
+  const started=Date.now();
+  try {
+    const result=await boundedSupabaseTransportFetch(env,url,options);
+    console.info("PRIMA_QA_TRACE",JSON.stringify({version:"R2.24.17",
+      stage:"supabase_http",module:"src/supabase.js",fn:"qaSupabaseFetch",
+      operation:rpc || table || "unknown",method,status:result.status,
+      duration_ms:Date.now()-started}));
+    // QA-only diagnostic: read a cloned ERROR response. Never log body,
+    // message, detail, hint, URL, query, request payload or credentials.
+    // The original Response remains untouched for existing error handlers.
+    if (!result.ok) {
+      try {
+        const errorData = await result.clone().json();
+        const code = typeof errorData?.code === "string" &&
+          /^[A-Za-z0-9_]{1,32}$/.test(errorData.code)
+            ? errorData.code : null;
+        console.info("PRIMA_QA_TRACE",JSON.stringify({version:"R2.24.25",
+          stage:"supabase_error_code",module:"src/supabase.js",fn:"qaSupabaseFetch",
+          operation:rpc || table || "unknown",method,status:result.status,
+          error_code:code}));
+      } catch {
+        console.info("PRIMA_QA_TRACE",JSON.stringify({version:"R2.24.25",
+          stage:"supabase_error_code",module:"src/supabase.js",fn:"qaSupabaseFetch",
+          operation:rpc || table || "unknown",method,status:result.status,
+          error_code:null}));
+      }
+    }
+    return result;
+  } catch (error) {
+    console.info("PRIMA_QA_TRACE",JSON.stringify({version:"R2.24.17",
+      stage:"supabase_http",module:"src/supabase.js",fn:"qaSupabaseFetch",
+      operation:rpc || table || "unknown",method,status:"network_error",
+      duration_ms:Date.now()-started}));
+    throw error;
+  }
+}
+
 function headers(env) {
   if (!env.SUPABASE_REST_URL || !env.SUPABASE_SECRET_KEY) {
     throw new Error("supabase_not_configured");
@@ -13,10 +100,12 @@ function headers(env) {
 
 async function fetchReadWithRetry(
   url,
-  options
+  options,
+  env = null
 ) {
   try {
-    return await fetch(
+    return await qaSupabaseFetch(
+        env,
       url,
       options
     );
@@ -28,7 +117,8 @@ async function fetchReadWithRetry(
     );
 
     try {
-      return await fetch(
+      return await qaSupabaseFetch(
+        env,
         url,
         options
       );
@@ -51,7 +141,8 @@ export async function supabaseInsert(
   body,
   select = "*"
 ) {
-  const res = await fetch(
+  const res = await qaSupabaseFetch(
+        env,
     `${env.SUPABASE_REST_URL}/${table}?select=${encodeURIComponent(select)}`,
     {
       method: "POST",
@@ -81,7 +172,8 @@ export async function supabaseInsertIdempotentMessage(
   body,
   select = "*"
 ) {
-  const res = await fetch(
+  const res = await qaSupabaseFetch(
+        env,
     `${env.SUPABASE_REST_URL}/${table}?select=${encodeURIComponent(select)}`,
     {
       method: "POST",
@@ -184,7 +276,8 @@ export async function supabaseInsertIdempotentEvent(
   body,
   select = "*"
 ) {
-  const res = await fetch(
+  const res = await qaSupabaseFetch(
+        env,
     `${env.SUPABASE_REST_URL}/${table}?select=${encodeURIComponent(select)}`,
     {
       method: "POST",
@@ -274,7 +367,8 @@ export async function supabaseUpdate(
   query,
   body
 ) {
-  const res = await fetch(
+  const res = await qaSupabaseFetch(
+        env,
     `${env.SUPABASE_REST_URL}/${table}?${query}`,
     {
       method: "PATCH",
@@ -302,7 +396,8 @@ export async function supabaseUpdateReturning(
   query,
   body
 ) {
-  const res = await fetch(
+  const res = await qaSupabaseFetch(
+        env,
     `${env.SUPABASE_REST_URL}/${table}?${query}`,
     {
       method: "PATCH",
@@ -344,7 +439,7 @@ export async function supabaseSelect(
       {
         method: "GET",
         headers: headers(env)
-      }
+      }, env
     );
 
   const text = await res.text();
@@ -378,7 +473,7 @@ export async function supabaseRpc(
 
         body:
           JSON.stringify(payload)
-      }
+      }, env
     );
 
   if (!response.ok) {
@@ -416,7 +511,7 @@ export async function supabasePublicRpc(
 
         body:
           JSON.stringify(payload)
-      }
+      }, env
     );
 
   if (!response.ok) {

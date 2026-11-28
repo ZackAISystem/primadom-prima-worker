@@ -1,0 +1,171 @@
+{
+  "contract": "PRIMA_ROUTING_SINGLE_TURN_B01",
+  "scope": "ONE_INITIAL_MESSAGE_PER_FRESH_CONVERSATION",
+  "scenario_count": 10,
+  "notes": [
+    "Expected actions are QA hypotheses derived from the Luna action contract; current Worker decides actual execution",
+    "No answer quality or actual Search V3 results are tested",
+    "Contact cases are opt-out only; no contact capture authorized"
+  ],
+  "scenarios": [
+    {
+      "id": "S01",
+      "category": "property_search_structured",
+      "message": "Find 2-bedroom apartments in Dubai Hills under AED 2 million.",
+      "expected_actions": [
+        "SEARCH"
+      ],
+      "expected_routes": [
+        "property_search"
+      ],
+      "must_not_actions": [
+        "CONTACT"
+      ]
+    },
+    {
+      "id": "S02",
+      "category": "property_search_natural_language",
+      "message": "Show me off-plan villa projects in Dubai with three bedrooms and a budget up to AED 4 million.",
+      "expected_actions": [
+        "SEARCH"
+      ],
+      "expected_routes": [
+        "property_search"
+      ],
+      "must_not_actions": [
+        "CONTACT"
+      ]
+    },
+    {
+      "id": "S03",
+      "category": "concept_knowledge",
+      "message": "Explain what rental yield means for a property investor.",
+      "expected_actions": [
+        "KNOWLEDGE_QA"
+      ],
+      "expected_routes": [
+        "market_question",
+        "page_question"
+      ],
+      "must_not_actions": [
+        "SEARCH",
+        "CONTACT"
+      ]
+    },
+    {
+      "id": "S04",
+      "category": "developer_overview",
+      "message": "Tell me about Sobha Realty as a developer and what a buyer should evaluate before choosing one of its projects.",
+      "expected_actions": [
+        "KNOWLEDGE_QA",
+        "ADVISORY",
+        "EXACT_FACT"
+      ],
+      "expected_routes": [
+        "market_question",
+        "page_question",
+        "exact_fact"
+      ],
+      "must_not_actions": [
+        "CONTACT"
+      ]
+    },
+    {
+      "id": "S05",
+      "category": "exact_project_fact",
+      "message": "Who is the developer of 399 Hills Park?",
+      "expected_actions": [
+        "EXACT_FACT",
+        "KNOWLEDGE_QA"
+      ],
+      "expected_routes": [
+        "exact_fact",
+        "page_question"
+      ],
+      "must_not_actions": [
+        "SEARCH",
+        "CONTACT"
+      ]
+    },
+    {
+      "id": "S06",
+      "category": "buyer_advice_not_catalog",
+      "message": "I have AED 3 million. Should I prioritize rental yield or long-term capital appreciation when buying in Dubai?",
+      "expected_actions": [
+        "ADVISORY",
+        "KNOWLEDGE_QA"
+      ],
+      "expected_routes": [
+        "recommendation",
+        "market_question"
+      ],
+      "must_not_actions": [
+        "CONTACT"
+      ]
+    },
+    {
+      "id": "S07",
+      "category": "project_comparison",
+      "message": "Compare Dubai Hills Estate and Dubai Creek Harbour for a family who values schools, commute and long-term living.",
+      "expected_actions": [
+        "COMPARE",
+        "ADVISORY",
+        "KNOWLEDGE_QA"
+      ],
+      "expected_routes": [
+        "compare",
+        "recommendation",
+        "market_question"
+      ],
+      "must_not_actions": [
+        "CONTACT"
+      ]
+    },
+    {
+      "id": "S08",
+      "category": "persona_identity",
+      "message": "Who created Prima AI, and are you a human real-estate agent?",
+      "expected_actions": [
+        "PERSONA"
+      ],
+      "expected_routes": [
+        "persona_question"
+      ],
+      "must_not_actions": [
+        "SEARCH",
+        "CONTACT"
+      ]
+    },
+    {
+      "id": "S09",
+      "category": "contact_opt_out",
+      "message": "Please don't contact me or arrange a call with an agent. I only want to research properties myself.",
+      "expected_actions": [],
+      "expected_routes": [],
+      "must_not_actions": [
+        "CONTACT"
+      ],
+      "assertion": "ONLY_NON_CONTACT_AND_NO_CONTACT_TOOL"
+    },
+    {
+      "id": "S10",
+      "category": "mixed_knowledge_and_search",
+      "message": "First explain what off-plan means, then show me two-bedroom off-plan apartments in Dubai Marina under AED 3 million.",
+      "expected_actions": [
+        "SEARCH",
+        "KNOWLEDGE_QA",
+        "ADVISORY"
+      ],
+      "expected_routes": [
+        "property_search",
+        "market_question",
+        "recommendation"
+      ],
+      "must_not_actions": [
+        "CONTACT"
+      ],
+      "min_luna_tasks": 2,
+      "assertion": "COMPOUND_PRESERVATION"
+    }
+  ]
+}

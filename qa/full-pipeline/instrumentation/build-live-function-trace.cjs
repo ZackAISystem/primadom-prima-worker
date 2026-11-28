@@ -1,0 +1,249 @@
+#!/usr/bin/env node
+'use strict';
+// QA-only runtime AST transformation: always rebuild from CURRENT working tree.
+// Do not edit src/, do not deploy, do not copy secrets, do not ship production bundle.
+const fs=require('node:fs'), path=require('node:path'),crypto=require('node:crypto'),cp=require('node:child_process');
+const ROOT=process.cwd();
+const SRC=path.join(ROOT,'src');
+if(!fs.existsSync(path.join(SRC,'index.js')))throw Error('Run in PRIMA Worker repository');
+let ts;
+for(const p of ['typescript',path.join(ROOT,'qa/full-pipeline/.tools/node_modules/typescript')])try{ts=require(p);break}catch{}
+if(!ts)try{ts=require(path.join(cp.execFileSync('npm',['root','-g'],{encoding:'utf8'}).trim(),'typescript'))}catch{}
+if(!ts)throw Error('Install QA-only AST parser: npm install --prefix qa/full-pipeline/.tools --no-save --no-package-lock typescript@5.9.3');
+const OUT=path.join(ROOT,'qa/full-pipeline/.generated-live-trace');
+const CONFIG=path.join(ROOT,'wrangler.function-trace.local.jsonc');
+const REPORT=path.join(ROOT,'qa/full-pipeline/reports/function-trace-build-latest.json');
+const sha=v=>crypto.createHash('sha256').update(v).digest('hex');
+function walk(d){return fs.readdirSync(d,{withFileTypes:true}).flatMap(e=>{
+ const p=path.join(d,e.name); if(e.name.startsWith('.')||e.name.includes('.bak')||e.name.includes('.backup'))return [];
+ return e.isDirectory()?walk(p):e.isFile()&&/\.(js|mjs|json)$/.test(e.name)?[p]:[];
+}).sort()}
+const sourceFiles=walk(SRC);
+const hash=crypto.createHash('sha256');for(const f of sourceFiles){hash.update(path.relative(ROOT,f));hash.update('\0');hash.update(fs.readFileSync(f));hash.update('\0')};
+const originSha=hash.digest('hex');
+let stats={functions:0,instrumented:0,skipped:[],parsed_modules:0,generated_at:new Date().toISOString()};
+const instrumentable=new Set([ts.SyntaxKind.FunctionDeclaration,ts.SyntaxKind.FunctionExpression,ts.SyntaxKind.ArrowFunction,ts.SyntaxKind.MethodDeclaration,ts.SyntaxKind.GetAccessor,ts.SyntaxKind.SetAccessor]);
+const builds=[];
+for(const f of sourceFiles){
+ const rel=path.relative(ROOT,f).replaceAll(path.sep,'/');let source=fs.readFileSync(f,'utf8');
+ if(!/\.(js|mjs)$/.test(rel)){builds.push({rel,text:source});continue}
+ const sf=ts.createSourceFile(rel,source,ts.ScriptTarget.Latest,true,ts.ScriptKind.JS);
+ if(sf.parseDiagnostics.length)throw Error('AST_PARSE_ERROR '+rel+': '+JSON.stringify(sf.parseDiagnostics[0].messageText));
+ stats.parsed_modules++;let changes=[],hasInstrumented=false,roots=0;
+ function visit(node){
+  if(ts.isFunctionLike(node)&&node.body){
+   stats.functions++;
+   const name=node.name?.getText(sf)||'<anonymous>',line=sf.getLineAndCharacterOfPosition(node.getStart(sf)).line+1;
+   const id=rel+':'+line+':'+name;
+   const isRoot=rel==='src/index.js'&&name==='fetch'&&node.parent?.kind===ts.SyntaxKind.ObjectLiteralExpression&&node.parent?.parent?.kind===ts.SyntaxKind.ExportAssignment;
+   let skipReason='';
+   if(!instrumentable.has(node.kind))skipReason='special_function';
+   else if(!ts.isBlock(node.body) && !ts.isArrowFunction(node))skipReason='nonblock_nonarrow';
+   else if(node.asteriskToken)skipReason='generator';
+   else if(ts.isConstructorDeclaration(node))skipReason='constructor';
+   else if(name==='constructor')skipReason='constructor';
+   else if(/\b(?:eval|with)\s*\(/.test(source.slice(node.body.pos,node.body.end)))skipReason='dynamic_scope';
+   // `arguments` in arrow wrappers remains lexical. `super` in a method remains lexical.
+   if(skipReason){stats.skipped.push({id,reason:skipReason})}
+   else {
+    const start=node.body.getStart(sf),end=node.body.end;
+    const asyncFlag=node.modifiers?.some(x=>x.kind===ts.SyntaxKind.AsyncKeyword)||node.asyncModifier?'async ':'';
+    const boundary=/(?:router|fast-gate|decision-policy|conversation-move|prima-search-request|search-context|context|search-response|openai-reasoning|persona-semantic-a1)\.js$/.test(rel);
+    const safeParamNames=node.parameters.filter(p=>ts.isIdentifier(p.name)&&!p.dotDotDotToken).map(p=>p.name.text);
+    const boundaryArgs=boundary?`, () => [${safeParamNames.join(', ')}]`:'';
+    if(ts.isBlock(node.body)){
+      const prefix=isRoot?`\nreturn qaTraceRoot(env, async () => {\n`:`\nreturn qaTraceCall(${JSON.stringify(id)}, ${asyncFlag}() => {\n`;
+      const suffix=isRoot?'\n});\n':`\n}${boundaryArgs});\n`;
+      changes.push({at:start+1,text:prefix},{at:end-1,text:suffix});
+    }else{
+      changes.push({at:start,text:`qaTraceCall(${JSON.stringify(id)}, ${asyncFlag}() => (`},{at:end,text:`)${boundaryArgs})`});
+    }
+    hasInstrumented=true;stats.instrumented++;if(isRoot)roots++;
+   }
+  }
+  ts.forEachChild(node,visit)
+ }
+ visit(sf);
+ if(rel==='src/index.js'&&roots!==1)throw Error('Expected precisely one primary Worker fetch root, found '+roots);
+ if(hasInstrumented){
+  changes.sort((a,b)=>b.at-a.at);
+  for(const {at,text} of changes)source=source.slice(0,at)+text+source.slice(at);
+  source=`import { qaTraceCall, qaTraceRoot } from './qa-function-trace.js';\n`+source;
+  const validation=ts.createSourceFile(rel,source,ts.ScriptTarget.Latest,true,ts.ScriptKind.JS);
+  if(validation.parseDiagnostics.length)throw Error('INSTRUMENTED_PARSE_ERROR '+rel+': '+JSON.stringify(validation.parseDiagnostics[0].messageText));
+ }
+ builds.push({rel,text:source});
+}
+const runtime=`import { AsyncLocalStorage } from 'node:async_hooks';
+const store = new AsyncLocalStorage();
+let sequence = 0;
+function shape(value) {
+  if (value === null) return 'null';
+  if (value === undefined) return 'undefined';
+  if (Array.isArray(value)) return {type:'array',length:value.length};
+  if (value instanceof Error) return {type:'error',name:String(value.name||'Error').slice(0,70)};
+  if (typeof value === 'object') return {type:'object',keys:Object.keys(value).slice(0,18)};
+  return typeof value;
+}
+function emit(context,record) {
+  if(context.shared) {
+    context.shared.events++;
+    if(context.shared.events>25000){
+      if(!context.shared.warned){context.shared.warned=true; console.warn('PRIMA_QA_FN_TRACE',JSON.stringify({event:'trace_truncated',trace_id:context.trace_id,max_events:25000}));}
+      return;
+    }
+  }
+  console.info('PRIMA_QA_FN_TRACE',JSON.stringify({
+    version:'R2.24.20',trace_id:context.trace_id,span_id:context.span_id,
+    parent_span_id:context.parent_span_id,seq:++sequence,
+    timestamp:new Date().toISOString(),...record
+  }));
+}
+export function qaTraceRoot(env,run) {
+  if (env?.PRIMA_QA_FUNCTION_TRACE !== '1') return run();
+  installProviderObserver();
+  const context={trace_id:crypto.randomUUID(),span_id:'root',parent_span_id:null,shared:{events:0,warned:false}};
+  return store.run(context,()=> {
+    emit(context,{event:'request_begin',id:'src/index.js:fetch'});
+    const start=performance.now();
+    try {
+      const result=run();
+      return Promise.resolve(result).then(value=>{
+        emit(context,{event:'request_end',id:'src/index.js:fetch',duration_ms:Math.round(performance.now()-start),result:shape(value)});
+        return value;
+      },error=>{
+        emit(context,{event:'request_error',id:'src/index.js:fetch',duration_ms:Math.round(performance.now()-start),error:shape(error)});
+        throw error;
+      });
+    } catch(error) {
+      emit(context,{event:'request_error',id:'src/index.js:fetch',duration_ms:Math.round(performance.now()-start),error:shape(error)});
+      throw error;
+    }
+  });
+}
+export function qaTraceCall(id,fn,boundaryArgs) {
+  const parent=store.getStore();
+  if(!parent)return fn();
+  const context={trace_id:parent.trace_id,span_id:String(++sequence),parent_span_id:parent.span_id,shared:parent.shared};
+  const start=performance.now();
+  emit(context,{event:'function_enter',id});
+  if(boundaryArgs)try{emit(context,{event:'boundary_input',id,boundary:safeBoundary(boundaryArgs())});}catch{}
+  return store.run(context,()=> {
+    try {
+      const result=fn();
+      if(result&&typeof result.then==='function'){
+        return result.then(value=>{
+          if(boundaryArgs)try{emit(context,{event:'boundary_output',id,boundary:safeBoundary(value)});}catch{}
+          emit(context,{event:'function_exit',id,duration_ms:Math.round(performance.now()-start),result:shape(value),usage:extractUsage(value)});
+          return value;
+        },error=>{
+          emit(context,{event:'function_error',id,duration_ms:Math.round(performance.now()-start),error:shape(error)});
+          throw error;
+        });
+      }
+      if(boundaryArgs)try{emit(context,{event:'boundary_output',id,boundary:safeBoundary(result)});}catch{}
+      emit(context,{event:'function_exit',id,duration_ms:Math.round(performance.now()-start),result:shape(result),usage:extractUsage(result)});
+      return result;
+    }catch(error){emit(context,{event:'function_error',id,duration_ms:Math.round(performance.now()-start),error:shape(error)});throw error;}
+  });
+}
+// Only safe metadata and structural information; never full content, tokens, headers, keys or URLs.
+function safeBoundary(value,depth=0){
+ if(value==null)return value===null?'null':'undefined';
+ if(Array.isArray(value))return {type:'array',length:value.length,items:depth===0?value.slice(0,6).map(v=>safeBoundary(v,1)):undefined};
+ if(typeof value!=='object')return {type:typeof value,length:typeof value==='string'?value.length:undefined};
+ const keys=Object.keys(value).slice(0,24);const out={type:'object',keys};
+ for(const k of ['version','phase','entity_type','language','language_code','state','tool','route','action','response_type','next_action','property_type']){
+  try{if(Object.prototype.hasOwnProperty.call(value,k)){
+    const v=value[k];if(typeof v==='string'&&v.length<=48&&/^[a-zA-Z0-9_-]+$/.test(v))out[k]=v;
+  }}catch{}
+ }
+ for(const k of ['result_count','total_count','max_results','min_price','max_price','min_budget','max_budget','bedrooms','limit','offset']){
+  try{if(Number.isSafeInteger(value[k])&&value[k]>=0)out[k]=value[k]}catch{}
+ }
+ for(const k of ['results','projects','cards','turn','search_context']){
+  try{if(Object.prototype.hasOwnProperty.call(value,k))out[k]=shape(value[k])}catch{}
+ }
+ // Only explicitly permitted structured search-filter keys; never free text, user identifiers or prompts.
+ try{if(value.filters&&typeof value.filters==='object'&&!Array.isArray(value.filters)){
+  const f={};for(const k of ['min_price','max_price','min_budget','max_budget','bedrooms','limit','offset']){
+   const v=value.filters[k];if(Number.isSafeInteger(v)&&v>=0)f[k]=v;
+  }
+  for(const k of ['property_type','language_code']){
+   const v=value.filters[k];if(typeof v==='string'&&v.length<=32&&/^[a-zA-Z0-9_-]+$/.test(v))f[k]=v;
+  }
+  if(Object.keys(f).length)out.safe_filters=f;
+ }}catch{}
+ return out;
+}
+let providerObserverInstalled=false;
+function installProviderObserver(){
+ if(providerObserverInstalled)return;
+ providerObserverInstalled=true;
+ const originalFetch=globalThis.fetch;
+ if(typeof originalFetch!=='function')return;
+ globalThis.fetch=async function primaQaProviderFetch(input,init){
+  let endpoint;
+  try{endpoint=new URL(typeof input==='string'?input:input.url)}catch{return originalFetch.apply(this,arguments)}
+  const host=endpoint.hostname.toLowerCase();
+  const provider=host==='api.openai.com'?'openai':host==='api.anthropic.com'?'anthropic':host==='generativelanguage.googleapis.com'?'google':host==='api.groq.com'?'groq':null;
+  const context=store.getStore();
+  if(!provider||!context)return originalFetch.apply(this,arguments);
+  const call_id=crypto.randomUUID(),started=performance.now();
+  emit(context,{event:'llm_http_start',call_id,provider,endpoint: endpoint.pathname.slice(0,90)});
+  try{
+   const response=await originalFetch.apply(this,arguments);
+   let usage=null,model=null,accounting='NOT_CAPTURED';
+   const ctype=String(response.headers.get('content-type')||'');
+   const length=Number(response.headers.get('content-length')||0);
+   if((ctype.toLowerCase().includes('application/json')||ctype.toLowerCase().includes('+json'))&&length<1500000){
+    try{
+     const data=await response.clone().json();
+     if(data&&typeof data==='object'){
+      model=typeof data.model==='string'?data.model.slice(0,90):null;
+      const u=data.usage||data.usageMetadata;
+      if(u&&typeof u==='object'){
+       usage={};for(const k of ['input_tokens','output_tokens','total_tokens','prompt_tokens','completion_tokens','inputTokens','outputTokens','promptTokenCount','candidatesTokenCount','totalTokenCount']){
+        if(Number.isSafeInteger(u[k])&&u[k]>=0)usage[k]=u[k];
+       }
+       if(Object.keys(usage).length)accounting='PROVIDER_REPORTED';
+      }
+     }
+    }catch{accounting='RESPONSE_USAGE_UNREADABLE'}
+   }else accounting='RESPONSE_NOT_JSON_OR_LARGE';
+   emit(context,{event:'llm_http_end',call_id,provider,http_status:response.status,model,usage,accounting,duration_ms:Math.round(performance.now()-started)});
+   return response;
+  }catch(error){emit(context,{event:'llm_http_error',call_id,provider,error:shape(error),duration_ms:Math.round(performance.now()-started)});throw error;}
+ };
+}
+function extractUsage(value){
+ const u=value&&typeof value==='object'&&value.usage;
+ if(!u||typeof u!=='object')return undefined;
+ const out={};for(const key of ['input_tokens','output_tokens','total_tokens','prompt_tokens','completion_tokens']){
+  if(Number.isFinite(u[key]))out[key]=u[key];
+ }
+ return Object.keys(out).length?out:undefined;
+}
+`;
+// Build into a temporary directory then swap atomically. This build is always refreshed from src/.
+const temp=OUT+'-tmp-'+process.pid;
+if(fs.existsSync(temp))fs.rmSync(temp,{recursive:true,force:true});
+for(const b of builds){const target=path.join(temp,b.rel);fs.mkdirSync(path.dirname(target),{recursive:true});fs.writeFileSync(target,b.text)}
+fs.writeFileSync(path.join(temp,'src/qa-function-trace.js'),runtime);
+fs.writeFileSync(path.join(temp,'package.json'),JSON.stringify({type:'module'})+'\n');
+for(const folder of ['contracts']){
+ const from=path.join(ROOT,folder),to=path.join(temp,folder);
+ if(fs.existsSync(from))fs.cpSync(from,to,{recursive:true});
+}
+if(fs.existsSync(OUT))fs.rmSync(OUT,{recursive:true,force:true});fs.renameSync(temp,OUT);
+const qaConfig=fs.readFileSync(path.join(ROOT,'wrangler.qa.jsonc'),'utf8');
+// Avoid JSONC routes: generated QA config is local only and cannot be deployed unintentionally.
+const conf={name:'primadom-prima-worker-qa-local-trace',main:'./qa/full-pipeline/.generated-live-trace/src/index.js',compatibility_date:'2026-10-01',compatibility_flags:['nodejs_compat'],workers_dev:false,vars:{PRIMA_PERSONA_GENERATIVE_A1:'1',PRIMA_SEARCH_PRODUCTION:'1',PRIMA_QA_FUNCTION_TRACE:'1'}};
+fs.writeFileSync(CONFIG,JSON.stringify(conf,null,2)+'\n');
+fs.mkdirSync(path.dirname(REPORT),{recursive:true});
+const report={contract:'PRIMA_FUNCTION_TRACE_BUILD_V1',source_mode:'REBUILT_FROM_CURRENT_WORKTREE',source_sha256:originSha,ast_parser:'typescript',...stats,limitations:['Execution coverage must be measured from runtime logs, never from AST inventory.','Function result values are shape-only to avoid PII and secrets.','Function-body transformation can expose JS edge cases; execute regression tests before E2E.','Browser Search V3 is separate and NOT included.','No production deploy; generated config is local QA only.']};
+fs.writeFileSync(REPORT,JSON.stringify(report,null,2));
+console.log('R2.24.20 BUILD COMPLETE');console.log('SOURCE_SHA256',originSha);console.log('MODULES',stats.parsed_modules,'FUNCTIONS',stats.functions,'INSTRUMENTED',stats.instrumented,'SKIPPED',stats.skipped.length);
+console.log('GENERATED_QA_ENTRY',path.relative(ROOT,path.join(OUT,'src/index.js')));
+console.log('WRANGLER_QA_CONFIG',path.relative(ROOT,CONFIG));
+console.log('WORKER_SOURCE_MODIFIED: 0; DEPLOYS: 0; DB_CALLS: 0');
